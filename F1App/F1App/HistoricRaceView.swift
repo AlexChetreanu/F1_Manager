@@ -142,7 +142,7 @@ struct HistoricRaceView: View {
                 }
                 .frame(height: 250)
 
-                Button(isAnimating ? "Stop Race Replay" : "Start Race Replay") {
+                Button(isAnimating ? "Stop Race" : "Start Race") {
                     if isAnimating {
                         stopAnimation()
                     } else {
