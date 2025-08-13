@@ -15,7 +15,7 @@ struct HistoricalRaceView: View {
             .pickerStyle(SegmentedPickerStyle())
             .padding(.horizontal)
             .onChange(of: viewModel.selectedYear) { year in
-                Task { await viewModel.fetchMeeting(for: year, circuitKey: race.circuit_id ?? "") }
+                Task { await viewModel.fetchMeeting(for: year, circuitId: race.circuit_id) }
             }
 
             if viewModel.isLoading {
@@ -80,7 +80,7 @@ struct HistoricalRaceView: View {
         }
         .onAppear {
             viewModel.loadYears()
-            Task { await viewModel.fetchMeeting(for: viewModel.selectedYear, circuitKey: race.circuit_id ?? "") }
+            Task { await viewModel.fetchMeeting(for: viewModel.selectedYear, circuitId: race.circuit_id) }
         }
         .sheet(item: $selectedDriver) { driver in
             DriverHistoricalDetailView(driver: driver, meetingKey: viewModel.meetingKey ?? 0)

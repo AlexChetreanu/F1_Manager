@@ -19,8 +19,9 @@ class ImportRaces extends Command
         $races = json_decode(file_get_contents($jsonPath), true);
 
         foreach ($races as $race) {
-            $circuitId = $race['id']; // ex: it-1922
-            $geoJsonPath = storage_path("app/data/circuits/{$circuitId}.geojson");
+            $circuitSlug = $race['id'];
+            $circuitId = $race['circuit_key']; // numeric OpenF1 circuit key
+            $geoJsonPath = storage_path("app/data/circuits/{$circuitSlug}.geojson");
 
             $coordinates = null;
             if (file_exists($geoJsonPath)) {
@@ -28,10 +29,10 @@ class ImportRaces extends Command
                     $geoData = json_decode(file_get_contents($geoJsonPath), true);
                     $coordinates = json_encode($geoData['features'][0]['geometry']['coordinates']);
                 } catch (\Exception $e) {
-                    $this->warn("Eroare la procesarea coordonatelor pentru {$circuitId}");
+                $this->warn("Eroare la procesarea coordonatelor pentru {$circuitSlug}");
                 }
             } else {
-                $this->warn("Fișierul GEOJSON lipsește pentru {$circuitId}");
+                $this->warn("Fișierul GEOJSON lipsește pentru {$circuitSlug}");
             }
             $this->info('Număr curse în JSON: ' . count($races));
 
