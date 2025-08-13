@@ -25,15 +25,15 @@ struct RaceDetailView: View {
             
             Spacer()
             
-            if selectedTab == 0 {
-                CircuitView(coordinatesJSON: race.coordinates)
-                    .frame(height: UIScreen.main.bounds.height / 2)
-                    .padding()
-            } else if selectedTab == 1 {
-                Text("Section 2 content").font(.title)
-            } else {
-                Text("Section 3 content").font(.title)
-            }
+        if selectedTab == 0 {
+            CircuitView(coordinatesJSON: race.coordinates)
+                .frame(height: UIScreen.main.bounds.height / 2)
+                .padding()
+        } else if selectedTab == 1 {
+            Text("Section 2 content").font(.title)
+        } else {
+            RaceReplayView(race: race)
+        }
             
             Spacer()
         }
