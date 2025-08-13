@@ -58,7 +58,7 @@ struct HistoricRaceView: View {
     // MARK: - Helpers
     func parseCoordinates() -> [CGPoint] {
         guard
-            let jsonString = coordinatesJSON,
+            let jsonString = viewModel.race?.coordinates ?? coordinatesJSON,
             let data = jsonString.data(using: .utf8),
             let arr = try? JSONSerialization.jsonObject(with: data) as? [[Double]]
         else {
