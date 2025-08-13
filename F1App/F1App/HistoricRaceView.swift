@@ -58,7 +58,7 @@ struct HistoricRaceView: View {
     // MARK: - Helpers
     func parseCoordinates() -> [CGPoint] {
         guard
-            let jsonString = viewModel.race?.coordinates ?? coordinatesJSON,
+            let jsonString = coordinatesJSON,
             let data = jsonString.data(using: .utf8),
             let arr = try? JSONSerialization.jsonObject(with: data) as? [[Double]]
         else {
@@ -106,66 +106,72 @@ struct HistoricRaceView: View {
                 viewModel.fetchRace(circuitId: circuitId, year: year)
             }
 
-            Text("Last held on: \(viewModel.race?.date ?? "-")")
-                .font(.headline)
-                .frame(maxWidth: .infinity, alignment: .center)
+            if let race = viewModel.race {
+                Text("Last held on: \(race.date)")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
-            GeometryReader { geo in
-                let points = parseCoordinates()
-                ZStack {
-                    if !points.isEmpty {
-                        Path { path in
-                            let first = points[0]
-                            path.move(to: CGPoint(x: first.x * geo.size.width, y: first.y * geo.size.height))
-                            for point in points.dropFirst() {
-                                path.addLine(to: CGPoint(x: point.x * geo.size.width, y: point.y * geo.size.height))
-                            }
-                        }
-                        .stroke(Color.gray, lineWidth: 2)
-                        .background(Color.black.opacity(0.05))
-                        .cornerRadius(8)
-
-                        ForEach(drivers) { driver in
-                            let idx = (currentStep + driver.offset) % max(points.count, 1)
-                            let pos = points.isEmpty ? .zero : points[idx]
-                            DriverMarker(driver: driver)
-                                .position(x: pos.x * geo.size.width, y: pos.y * geo.size.height)
-                                .onTapGesture {
-                                    selectedDriver = driver
+                GeometryReader { geo in
+                    let points = parseCoordinates()
+                    ZStack {
+                        if !points.isEmpty {
+                            Path { path in
+                                let first = points[0]
+                                path.move(to: CGPoint(x: first.x * geo.size.width, y: first.y * geo.size.height))
+                                for point in points.dropFirst() {
+                                    path.addLine(to: CGPoint(x: point.x * geo.size.width, y: point.y * geo.size.height))
                                 }
+                            }
+                            .stroke(Color.gray, lineWidth: 2)
+                            .background(Color.black.opacity(0.05))
+                            .cornerRadius(8)
+
+                            ForEach(drivers) { driver in
+                                let idx = (currentStep + driver.offset) % max(points.count, 1)
+                                let pos = points.isEmpty ? .zero : points[idx]
+                                DriverMarker(driver: driver)
+                                    .position(x: pos.x * geo.size.width, y: pos.y * geo.size.height)
+                                    .onTapGesture {
+                                        selectedDriver = driver
+                                    }
+                            }
+                        } else {
+                            Text("No track data")
                         }
+                    }
+                }
+                .frame(height: 250)
+
+                Button(isAnimating ? "Stop Race Replay" : "Start Race Replay") {
+                    if isAnimating {
+                        stopAnimation()
                     } else {
-                        Text("No track data")
+                        let count = parseCoordinates().count
+                        if count > 0 {
+                            startAnimation(with: count)
+                        }
                     }
                 }
-            }
-            .frame(height: 250)
+                .buttonStyle(.borderedProminent)
+                .frame(maxWidth: .infinity)
 
-            Button(isAnimating ? "Stop Race Replay" : "Start Race Replay") {
-                if isAnimating {
-                    stopAnimation()
-                } else {
-                    let count = parseCoordinates().count
-                    if count > 0 {
-                        startAnimation(with: count)
-                    }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Track Temp: \(stats.trackTemperature)")
+                    Text("Air Temp: \(stats.airTemperature)")
+                    Text("Wind: \(stats.windSpeed)")
+                    Text("Fastest Lap: \(stats.fastestLap) - \(stats.fastestDriver)")
+                    Text("Total Laps: \(stats.totalLaps)")
+                    Text("Pit Stops: \(stats.pitStops)")
+                    Text("Safety Cars: \(stats.safetyCars)")
                 }
-            }
-            .buttonStyle(.borderedProminent)
-            .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Track Temp: \(stats.trackTemperature)")
-                Text("Air Temp: \(stats.airTemperature)")
-                Text("Wind: \(stats.windSpeed)")
-                Text("Fastest Lap: \(stats.fastestLap) - \(stats.fastestDriver)")
-                Text("Total Laps: \(stats.totalLaps)")
-                Text("Pit Stops: \(stats.pitStops)")
-                Text("Safety Cars: \(stats.safetyCars)")
+                Spacer()
+            } else {
+                Text("No race was held on this circuit in \(selectedYear)")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Spacer()
         }
         .padding()
         .sheet(item: $selectedDriver) { driver in
