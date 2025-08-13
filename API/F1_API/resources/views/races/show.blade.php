@@ -6,6 +6,14 @@
     </x-slot>
 
     <div class="container py-6">
+        <p class="mb-4 text-gray-600 dark:text-gray-400">Status:
+            <span class="font-semibold
+                {{ in_array(strtolower($race->status), ['finished', 'in progress']) ? 'text-green-600 dark:text-green-400' : '' }}
+                {{ strtolower($race->status) === 'cancelled' ? 'text-red-600 dark:text-red-400' : '' }}
+                {{ !in_array(strtolower($race->status), ['finished', 'in progress', 'cancelled']) ? 'text-yellow-600 dark:text-yellow-400' : '' }}">
+                {{ $race->status }}
+            </span>
+        </p>
         <canvas id="circuitCanvas" width="800" height="400" style="border:1px solid #ccc;"></canvas>
     </div>
 
