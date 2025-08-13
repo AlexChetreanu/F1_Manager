@@ -32,7 +32,7 @@ struct RaceDetailView: View {
             } else if selectedTab == 1 {
                 Text("Section 2 content").font(.title)
             } else {
-                Text("Section 3 content").font(.title)
+                HistoricalRaceView(race: race)
             }
             
             Spacer()
