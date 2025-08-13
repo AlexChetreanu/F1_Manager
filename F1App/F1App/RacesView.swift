@@ -8,24 +8,39 @@ import SwiftUI
 
 struct RacesView: View {
     @StateObject private var viewModel = RacesViewModel()
-    
+    @State private var selectedYear = Calendar.current.component(.year, from: Date())
+
     var body: some View {
         NavigationView {
-            List(viewModel.races) { race in
-                NavigationLink(destination: RaceDetailView(race: race)) {
-                    VStack(alignment: .leading) {
-                        Text(race.location).font(.headline)
-                        Text("Date: \(race.date)").font(.subheadline)
-                        Text("Status: \(race.status)")
-                            .font(.caption)
-                            .foregroundColor(statusColor(race.status))
+            VStack {
+                Picker("Year", selection: $selectedYear) {
+                    ForEach((1950...Calendar.current.component(.year, from: Date())).reversed(), id: \.self) {
+                        Text("\($0)").tag($0)
                     }
-                    .padding(8)
+                }
+                .pickerStyle(MenuPickerStyle())
+
+                Button("Start Race") {
+                    viewModel.fetchRaces(year: selectedYear)
+                }
+                .buttonStyle(.borderedProminent)
+
+                List(viewModel.races) { race in
+                    NavigationLink(destination: RaceDetailView(race: race)) {
+                        VStack(alignment: .leading) {
+                            Text(race.location).font(.headline)
+                            Text("Date: \(race.date)").font(.subheadline)
+                            Text("Status: \(race.status)")
+                                .font(.caption)
+                                .foregroundColor(statusColor(race.status))
+                        }
+                        .padding(8)
+                    }
                 }
             }
-            .navigationTitle("F1 Circuits")
+            .navigationTitle("F1 Races")
             .onAppear {
-                viewModel.fetchRaces()
+                viewModel.fetchRaces(year: selectedYear)
             }
         }
     }
