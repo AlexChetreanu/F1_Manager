@@ -17,8 +17,8 @@ struct RaceDetailView: View {
         VStack {
             Picker("Select Section", selection: $selectedTab) {
                 Text("Circuit").tag(0)
-                Text("Section 2").tag(1)
-                Text("Section 3").tag(2)
+                Text("Details").tag(1)
+                Text("Historic Race").tag(2)
             }
             .pickerStyle(SegmentedPickerStyle())
             .padding()
@@ -32,7 +32,7 @@ struct RaceDetailView: View {
             } else if selectedTab == 1 {
                 Text("Section 2 content").font(.title)
             } else {
-                Text("Section 3 content").font(.title)
+                HistoricRaceView(coordinatesJSON: race.coordinates, lastHeldDate: race.date)
             }
             
             Spacer()
