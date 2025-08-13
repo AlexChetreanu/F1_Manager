@@ -10,9 +10,19 @@ use Carbon\Carbon;
 class RaceController extends Controller
 {
     // API endpoint JSON
-    public function apiIndex()
+    public function apiIndex(Request $request)
     {
-        $races = DB::table('races')->get()->map(fn($race) => $this->applyDynamicStatus($race));
+        $query = DB::table('races');
+
+        if ($request->has('year')) {
+            $query->whereYear('date', $request->query('year'));
+        }
+
+        if ($request->has('circuit_id')) {
+            $query->where('circuit_id', $request->query('circuit_id'));
+        }
+
+        $races = $query->get()->map(fn($race) => $this->applyDynamicStatus($race));
         return response()->json($races);
     }
 

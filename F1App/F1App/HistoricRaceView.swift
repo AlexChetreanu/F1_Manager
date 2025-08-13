@@ -2,7 +2,10 @@ import SwiftUI
 
 struct HistoricRaceView: View {
     let coordinatesJSON: String?
-    let lastHeldDate: String
+    let circuitId: String
+
+    @State private var selectedYear = Calendar.current.component(.year, from: Date())
+    @StateObject private var viewModel = HistoricRaceViewModel()
 
     // MARK: - Nested Models
     struct Driver: Identifiable {
@@ -92,7 +95,18 @@ struct HistoricRaceView: View {
     // MARK: - Body
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Last held on: \(lastHeldDate)")
+            Picker("Year", selection: $selectedYear) {
+                ForEach((1950...Calendar.current.component(.year, from: Date())).reversed(), id: \.self) {
+                    Text("\($0)").tag($0)
+                }
+            }
+            .pickerStyle(MenuPickerStyle())
+            .frame(maxWidth: .infinity, alignment: .center)
+            .onChange(of: selectedYear) { year in
+                viewModel.fetchRace(circuitId: circuitId, year: year)
+            }
+
+            Text("Last held on: \(viewModel.race?.date ?? "-")")
                 .font(.headline)
                 .frame(maxWidth: .infinity, alignment: .center)
 
@@ -157,6 +171,9 @@ struct HistoricRaceView: View {
         .sheet(item: $selectedDriver) { driver in
             DriverDetailCard(driver: driver)
         }
+        .onAppear {
+            viewModel.fetchRace(circuitId: circuitId, year: selectedYear)
+        }
     }
 }
 
@@ -191,6 +208,6 @@ struct DriverDetailCard: View {
 }
 
 #Preview {
-    HistoricRaceView(coordinatesJSON: "[[0,0],[1,0],[1,1],[0,1]]", lastHeldDate: "2024-05-12")
+    HistoricRaceView(coordinatesJSON: "[[0,0],[1,0],[1,1],[0,1]]", circuitId: "demo")
 }
 

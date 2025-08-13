@@ -32,7 +32,7 @@ struct RaceDetailView: View {
             } else if selectedTab == 1 {
                 Text("Section 2 content").font(.title)
             } else {
-                HistoricRaceView(coordinatesJSON: race.coordinates, lastHeldDate: race.date)
+                HistoricRaceView(coordinatesJSON: race.coordinates, circuitId: race.circuit_id ?? "")
             }
             
             Spacer()
