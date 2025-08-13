@@ -2,23 +2,26 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Http;
 use App\Models\Driver;
+use App\Services\OpenF1Client;
 
 class ImportDrivers extends Command
 {
     protected $signature = 'import:drivers';
     protected $description = 'Import drivers with meeting_key 1262 from OpenF1 API';
 
+    public function __construct(protected OpenF1Client $client)
+    {
+        parent::__construct();
+    }
+
     public function handle()
     {
         $this->info('Importăm piloții cu meeting_key 1262...');
 
-        $response = Http::get('https://api.openf1.org/v1/drivers', [
+        $drivers = $this->client->fetchDrivers([
             'meeting_key' => 1262,
         ]);
-
-        $drivers = $response->json();
 
         // Puncte manuale (exemplu)
         $manualPoints = [
