@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class ImportRaces extends Command
 {
@@ -34,10 +35,11 @@ class ImportRaces extends Command
             }
             $this->info('Număr curse în JSON: ' . count($races));
 
-            $date = now()->toDateTimeString(); // Fără dată în fișier, folosim data curentă
-            $status = 'upcoming';
+            $date = isset($race['date'])
+                ? Carbon::parse($race['date'])
+                : now();
+            $status = $date->isFuture() ? 'upcoming' : 'finished';
             $this->info("Saving race: " . $race['name']);
-
 
             DB::table('races')->updateOrInsert(
                 ['circuit_id' => $circuitId],
