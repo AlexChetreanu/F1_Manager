@@ -67,14 +67,14 @@ class HistoricalRaceViewModel: ObservableObject {
         availableYears = Array((currentYear-5)...currentYear).reversed()
     }
 
-    func fetchMeeting(for year: Int, circuitKey: String) async {
-        guard !circuitKey.isEmpty else { return }
+    func fetchMeeting(for year: Int, circuitId: Int?) async {
+        guard let circuitId = circuitId else { return }
         isLoading = true
         defer { isLoading = false }
         meetingKey = nil
         drivers = []
         errorMessage = nil
-        let urlString = "https://api.openf1.org/v1/meetings?year=\(year)&circuit_key=\(circuitKey)"
+        let urlString = "https://api.openf1.org/v1/meetings?year=\(year)&circuit_key=\(circuitId)"
         guard let url = URL(string: urlString) else { return }
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
