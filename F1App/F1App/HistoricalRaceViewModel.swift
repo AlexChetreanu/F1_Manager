@@ -25,6 +25,11 @@ struct LocationPoint: Decodable {
     let y: Double
 }
 
+struct SessionInfo: Decodable {
+    let session_key: Int
+    let session_name: String
+}
+
 class HistoricalRaceViewModel: ObservableObject {
     @Published var year: String = ""
     @Published var errorMessage: String?
@@ -34,6 +39,7 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var currentPosition: [Int: LocationPoint] = [:]
     @Published var isRunning = false
     @Published var trackPoints: [CGPoint] = []
+    @Published var sessionKey: Int?
 
     private var timer: Timer?
     private var stepIndex = 0
@@ -85,24 +91,43 @@ class HistoricalRaceViewModel: ObservableObject {
             DispatchQueue.main.async {
                 self.meeting = meeting
                 self.errorMessage = nil
-                self.fetchDrivers(meetingKey: meeting.meeting_key)
+                self.fetchSession(meetingKey: meeting.meeting_key)
             }
         }.resume()
     }
 
-    private func fetchDrivers(meetingKey: Int) {
+    private func fetchSession(meetingKey: Int) {
+        guard let url = URL(string: "https://api.openf1.org/v1/sessions?meeting_key=\(meetingKey)&session_name=Race") else { return }
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            guard let data = data,
+                  let sessions = try? JSONDecoder().decode([SessionInfo].self, from: data),
+                  let session = sessions.first else {
+                DispatchQueue.main.async {
+                    self.errorMessage = "Nu am găsit sesiunea pentru cursă"
+                }
+                return
+            }
+            DispatchQueue.main.async {
+                self.sessionKey = session.session_key
+                self.errorMessage = nil
+                self.fetchDrivers(meetingKey: meetingKey, sessionKey: session.session_key)
+            }
+        }.resume()
+    }
+
+    private func fetchDrivers(meetingKey: Int, sessionKey: Int) {
         guard let url = URL(string: "https://api.openf1.org/v1/drivers?meeting_key=\(meetingKey)") else { return }
         URLSession.shared.dataTask(with: url) { data, _, _ in
             guard let data = data,
                   let drivers = try? JSONDecoder().decode([DriverInfo].self, from: data) else { return }
             DispatchQueue.main.async {
                 self.drivers = drivers
-                self.fetchLocations()
+                self.fetchLocations(sessionKey: sessionKey)
             }
         }.resume()
     }
 
-    private func fetchLocations() {
+    private func fetchLocations(sessionKey: Int) {
         guard let meeting = meeting else { return }
         let formatter = ISO8601DateFormatter()
         guard let start = formatter.date(from: meeting.date_start) else { return }
@@ -111,14 +136,24 @@ class HistoricalRaceViewModel: ObservableObject {
         let endStr = formatter.string(from: end)
 
         for driver in drivers {
-            let urlString = "https://api.openf1.org/v1/location?meeting_key=\(meeting.meeting_key)&driver_number=\(driver.driver_number)&date>=\(startStr)&date<=\(endStr)"
+            let urlString = "https://api.openf1.org/v1/location?session_key=\(sessionKey)&driver_number=\(driver.driver_number)&date>=\(startStr)&date<=\(endStr)"
             guard let encoded = urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
                   let url = URL(string: encoded) else { continue }
-            URLSession.shared.dataTask(with: url) { data, _, _ in
-                guard let data = data,
-                      let locs = try? JSONDecoder().decode([LocationPoint].self, from: data),
-                      !locs.isEmpty else { return }
+            URLSession.shared.dataTask(with: url) { data, _, error in
+                guard error == nil, let data = data else {
+                    DispatchQueue.main.async {
+                        self.errorMessage = "Eroare la încărcarea pozițiilor"
+                    }
+                    return
+                }
+                guard let locs = try? JSONDecoder().decode([LocationPoint].self, from: data), !locs.isEmpty else {
+                    DispatchQueue.main.async {
+                        self.errorMessage = "Date de locație indisponibile"
+                    }
+                    return
+                }
                 DispatchQueue.main.async {
+                    self.errorMessage = nil
                     self.positions[driver.driver_number] = locs
                     self.currentPosition[driver.driver_number] = locs.first
                 }
