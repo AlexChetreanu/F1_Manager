@@ -296,7 +296,7 @@ class HistoricalRaceViewModel: ObservableObject {
         let scaled = interval / playbackSpeed
         currentStepDuration = scaled
         timer = Timer.scheduledTimer(withTimeInterval: scaled, repeats: false) { _ in
-            withAnimation(.linear(duration: self.currentStepDuration)) {
+            withAnimation(.easeInOut(duration: self.currentStepDuration)) {
                 self.stepIndex += 1
                 self.updatePositions()
             }

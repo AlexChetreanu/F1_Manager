@@ -46,6 +46,15 @@ struct HistoricalRaceView: View {
                         }
                         .stroke(Color.blue, lineWidth: 2)
 
+                        if let startLoc = viewModel.positions[1]?.first {
+                            let startPoint = viewModel.point(for: startLoc, in: geo.size)
+                            Path { path in
+                                path.move(to: CGPoint(x: startPoint.x, y: startPoint.y - 10))
+                                path.addLine(to: CGPoint(x: startPoint.x, y: startPoint.y + 10))
+                            }
+                            .stroke(Color.green, lineWidth: 2)
+                        }
+
                         if !viewModel.currentPosition.isEmpty {
                             ForEach(viewModel.drivers) { driver in
                                 if let loc = viewModel.currentPosition[driver.driver_number] {
@@ -68,7 +77,7 @@ struct HistoricalRaceView: View {
                             }
                         }
                     }
-                    .animation(.linear(duration: viewModel.currentStepDuration), value: viewModel.stepIndex)
+                    .animation(.easeInOut(duration: viewModel.currentStepDuration), value: viewModel.stepIndex)
                 }
                 .frame(height: 300)
                 .background(Color.gray.opacity(0.1))
