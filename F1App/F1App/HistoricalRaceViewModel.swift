@@ -300,14 +300,18 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func timeIntervalForStep(_ index: Int) -> TimeInterval? {
-        guard let driverId = drivers.first?.driver_number,
-              let arr = positions[driverId],
-              index + 1 < arr.count,
-              let start = dateFormatter.date(from: arr[index].date),
-              let end = dateFormatter.date(from: arr[index + 1].date) else {
-            return nil
+        // În loc să folosim doar primul pilot (care poate să nu aibă suficiente
+        // puncte de locație), căutăm orice pilot care are date pentru pasul
+        // curent și următor. Astfel, animația va porni chiar dacă primul pilot
+        // din listă nu are date complete.
+        for arr in positions.values {
+            if index + 1 < arr.count,
+               let start = dateFormatter.date(from: arr[index].date),
+               let end = dateFormatter.date(from: arr[index + 1].date) {
+                return end.timeIntervalSince(start)
+            }
         }
-        return end.timeIntervalSince(start)
+        return nil
     }
 
     private func year(from iso: String) -> Int {
