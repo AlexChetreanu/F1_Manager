@@ -50,6 +50,8 @@ class HistoricalRaceViewModel: ObservableObject {
     private var trackBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationTransform: CGAffineTransform = .identity
+    private var isFetchingLocations = false
+    private var hasInitialLocations = false
 
     func load(for race: Race) {
         pause()
@@ -150,33 +152,61 @@ class HistoricalRaceViewModel: ObservableObject {
             end = start.addingTimeInterval(3 * 60 * 60)
         }
 
-        let startStr = formatter.string(from: start)
-        let endStr = formatter.string(from: end)
+        positions.removeAll()
+        currentPosition.removeAll()
+        hasInitialLocations = false
+        isFetchingLocations = true
 
+        fetchLocationChunk(sessionKey: sessionKey, current: start, end: end, formatter: formatter)
+    }
+
+    private func fetchLocationChunk(sessionKey: Int, current: Date, end: Date, formatter: ISO8601DateFormatter) {
+        let step: TimeInterval = 5 * 60
+        let next = min(current.addingTimeInterval(step), end)
+
+        let startStr = formatter.string(from: current)
+        let endStr = formatter.string(from: next)
         let urlString = "https://api.openf1.org/v1/location?session_key=\(sessionKey)&date>=\(startStr)&date<=\(endStr)"
         guard let encoded = urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: encoded) else { return }
+              let url = URL(string: encoded) else {
+            if next < end {
+                fetchLocationChunk(sessionKey: sessionKey, current: next, end: end, formatter: formatter)
+            } else {
+                isFetchingLocations = false
+            }
+            return
+        }
 
         URLSession.shared.dataTask(with: url) { data, _, error in
-            guard error == nil, let data = data else { return }
-            guard let locs = try? JSONDecoder().decode([LocationPoint].self, from: data) else { return }
+            if let data = data, error == nil,
+               let locs = try? JSONDecoder().decode([LocationPoint].self, from: data) {
+                let grouped = Dictionary(grouping: locs, by: { $0.driver_number })
 
-            let grouped = Dictionary(grouping: locs, by: { $0.driver_number })
-
-            DispatchQueue.main.async {
-                self.positions.removeAll()
-                self.currentPosition.removeAll()
-                for driver in self.drivers {
-                    if let arr = grouped[driver.driver_number], !arr.isEmpty {
-                        self.positions[driver.driver_number] = arr
-                        self.currentPosition[driver.driver_number] = arr.first
+                DispatchQueue.main.async {
+                    for driver in self.drivers {
+                        if let arr = grouped[driver.driver_number], !arr.isEmpty {
+                            var existing = self.positions[driver.driver_number] ?? []
+                            existing.append(contentsOf: arr)
+                            self.positions[driver.driver_number] = existing
+                            if self.currentPosition[driver.driver_number] == nil {
+                                self.currentPosition[driver.driver_number] = arr.first
+                            }
+                        }
+                    }
+                    self.errorMessage = self.positions.isEmpty ? "Date de locație indisponibile" : nil
+                    if !self.hasInitialLocations, !self.positions.isEmpty {
+                        self.calculateLocationBounds()
+                        self.updatePositions()
+                        self.hasInitialLocations = true
+                    } else if self.hasInitialLocations {
+                        self.updatePositions()
                     }
                 }
-                self.errorMessage = self.positions.isEmpty ? "Date de locație indisponibile" : nil
-                if !self.positions.isEmpty {
-                    self.calculateLocationBounds()
-                    self.updatePositions()
-                }
+            }
+            if next < end {
+                self.fetchLocationChunk(sessionKey: sessionKey, current: next, end: end, formatter: formatter)
+            } else {
+                DispatchQueue.main.async { self.isFetchingLocations = false }
             }
         }.resume()
     }
@@ -220,13 +250,14 @@ class HistoricalRaceViewModel: ObservableObject {
 
     func start() {
         guard !isRunning else { pause(); return }
+        guard maxSteps > 0 else { return }
         isRunning = true
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            self.stepIndex += 1
-            if self.stepIndex >= self.maxSteps {
-                self.pause()
-            } else {
+            if self.stepIndex < self.maxSteps - 1 {
+                self.stepIndex += 1
                 self.updatePositions()
+            } else if !self.isFetchingLocations {
+                self.pause()
             }
         }
     }
