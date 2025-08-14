@@ -183,6 +183,7 @@ class HistoricalRaceViewModel: ObservableObject {
                 let grouped = Dictionary(grouping: locs, by: { $0.driver_number })
 
                 DispatchQueue.main.async {
+                    var exceededBounds = false
                     for driver in self.drivers {
                         if let arr = grouped[driver.driver_number], !arr.isEmpty {
                             var existing = self.positions[driver.driver_number] ?? []
@@ -190,6 +191,15 @@ class HistoricalRaceViewModel: ObservableObject {
                             self.positions[driver.driver_number] = existing
                             if self.currentPosition[driver.driver_number] == nil {
                                 self.currentPosition[driver.driver_number] = arr.first
+                            }
+                            if self.hasInitialLocations && !exceededBounds {
+                                for loc in arr {
+                                    let p = CGPoint(x: loc.x, y: loc.y)
+                                    if !self.locationBounds.contains(p) {
+                                        exceededBounds = true
+                                        break
+                                    }
+                                }
                             }
                         }
                     }
@@ -200,6 +210,9 @@ class HistoricalRaceViewModel: ObservableObject {
                         self.updatePositions()
                         self.hasInitialLocations = true
                     } else if self.hasInitialLocations {
+                        if exceededBounds {
+                            self.calculateLocationBounds()
+                        }
                         self.updatePositions()
                     }
                 }
@@ -232,7 +245,7 @@ class HistoricalRaceViewModel: ObservableObject {
         let rotation = trackAngle - locAngle
         let scaleX = trackBounds.width / locationBounds.width
         let scaleY = trackBounds.height / locationBounds.height
-        let scale = (scaleX + scaleY) / 2
+        let scale = min(scaleX, scaleY)
 
         var t = CGAffineTransform.identity
         t = t.translatedBy(x: -locCenter.x, y: -locCenter.y)
@@ -244,8 +257,10 @@ class HistoricalRaceViewModel: ObservableObject {
 
     public func point(for loc: LocationPoint, in size: CGSize) -> CGPoint {
         let transformed = CGPoint(x: loc.x, y: loc.y).applying(locationTransform)
-        let nx = (transformed.x - trackBounds.minX) / trackBounds.width
-        let ny = 1 - (transformed.y - trackBounds.minY) / trackBounds.height
+        let rawX = (transformed.x - trackBounds.minX) / trackBounds.width
+        let rawY = 1 - (transformed.y - trackBounds.minY) / trackBounds.height
+        let nx = max(0, min(rawX, 1))
+        let ny = max(0, min(rawY, 1))
         return CGPoint(x: nx * size.width, y: ny * size.height)
     }
 
