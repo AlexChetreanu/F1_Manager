@@ -45,8 +45,13 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var sessionStart: String?
     @Published var sessionEnd: String?
     @Published var stepIndex: Int = 0
+    @Published var playbackSpeed: Double = 1.0
+    @Published var currentStepDuration: Double = 1.0
 
     private var timer: Timer?
+    private let speedOptions: [Double] = [1, 2, 5]
+    private var speedIndex = 0
+    private let dateFormatter = ISO8601DateFormatter()
     private var trackBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var isFetchingLocations = false
@@ -247,22 +252,22 @@ class HistoricalRaceViewModel: ObservableObject {
         guard !isRunning else { pause(); return }
         guard maxSteps > 0 else { return }
         isRunning = true
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            if self.stepIndex < self.maxSteps - 1 {
-                withAnimation(.linear(duration: 1)) {
-                    self.stepIndex += 1
-                    self.updatePositions()
-                }
-            } else if !self.isFetchingLocations {
-                self.pause()
-            }
-        }
+        scheduleNextStep()
     }
 
     func pause() {
         isRunning = false
         timer?.invalidate()
         timer = nil
+    }
+
+    func cycleSpeed() {
+        speedIndex = (speedIndex + 1) % speedOptions.count
+        playbackSpeed = speedOptions[speedIndex]
+        if isRunning {
+            timer?.invalidate()
+            scheduleNextStep()
+        }
     }
 
     var maxSteps: Int {
@@ -275,6 +280,34 @@ class HistoricalRaceViewModel: ObservableObject {
                 currentPosition[driver.driver_number] = arr[stepIndex]
             }
         }
+    }
+
+    private func scheduleNextStep() {
+        guard isRunning, stepIndex < maxSteps - 1,
+              let interval = timeIntervalForStep(stepIndex) else {
+            pause()
+            return
+        }
+        let scaled = interval / playbackSpeed
+        currentStepDuration = scaled
+        timer = Timer.scheduledTimer(withTimeInterval: scaled, repeats: false) { _ in
+            withAnimation(.linear(duration: self.currentStepDuration)) {
+                self.stepIndex += 1
+                self.updatePositions()
+            }
+            self.scheduleNextStep()
+        }
+    }
+
+    private func timeIntervalForStep(_ index: Int) -> TimeInterval? {
+        guard let driverId = drivers.first?.driver_number,
+              let arr = positions[driverId],
+              index + 1 < arr.count,
+              let start = dateFormatter.date(from: arr[index].date),
+              let end = dateFormatter.date(from: arr[index + 1].date) else {
+            return nil
+        }
+        return end.timeIntervalSince(start)
     }
 
     private func year(from iso: String) -> Int {
