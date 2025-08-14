@@ -68,6 +68,7 @@ struct HistoricalRaceView: View {
                             }
                         }
                     }
+                    .animation(.linear(duration: 1), value: viewModel.stepIndex)
                 }
                 .frame(height: 300)
                 .background(Color.gray.opacity(0.1))

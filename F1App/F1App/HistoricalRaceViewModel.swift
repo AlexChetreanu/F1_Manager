@@ -186,13 +186,15 @@ class HistoricalRaceViewModel: ObservableObject {
                     for driver in self.drivers {
                         if let arr = grouped[driver.driver_number], !arr.isEmpty {
                             var existing = self.positions[driver.driver_number] ?? []
-                            existing.append(contentsOf: arr)
+                            let sortedArr = arr.sorted { $0.date < $1.date }
+                            existing.append(contentsOf: sortedArr)
+                            existing.sort { $0.date < $1.date }
                             self.positions[driver.driver_number] = existing
                             if self.currentPosition[driver.driver_number] == nil {
-                                self.currentPosition[driver.driver_number] = arr.first
+                                self.currentPosition[driver.driver_number] = existing.first
                             }
                             if self.hasInitialLocations && !exceededBounds {
-                                for loc in arr {
+                                for loc in sortedArr {
                                     let p = CGPoint(x: loc.x, y: loc.y)
                                     if !self.locationBounds.contains(p) {
                                         exceededBounds = true
@@ -206,14 +208,11 @@ class HistoricalRaceViewModel: ObservableObject {
                     let totalLocations = self.positions.values.reduce(0) { $0 + $1.count }
                     if !self.hasInitialLocations, totalLocations >= 2 {
                         self.calculateLocationBounds()
-                        self.updatePositions()
                         self.hasInitialLocations = true
-                    } else if self.hasInitialLocations {
-                        if exceededBounds {
-                            self.calculateLocationBounds()
-                        }
-                        self.updatePositions()
+                    } else if self.hasInitialLocations && exceededBounds {
+                        self.calculateLocationBounds()
                     }
+                    self.updatePositions()
                 }
             }
             if next < end {
@@ -250,8 +249,10 @@ class HistoricalRaceViewModel: ObservableObject {
         isRunning = true
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             if self.stepIndex < self.maxSteps - 1 {
-                self.stepIndex += 1
-                self.updatePositions()
+                withAnimation(.linear(duration: 1)) {
+                    self.stepIndex += 1
+                    self.updatePositions()
+                }
             } else if !self.isFetchingLocations {
                 self.pause()
             }
