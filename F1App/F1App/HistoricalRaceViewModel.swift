@@ -53,6 +53,13 @@ class HistoricalRaceViewModel: ObservableObject {
     private var isFetchingLocations = false
     private var hasInitialLocations = false
 
+    /// Prepare track geometry if it hasn't been parsed yet.
+    /// - Parameter json: JSON string with track coordinates.
+    func ensureTrack(from json: String?) {
+        guard trackPoints.isEmpty else { return }
+        parseTrack(json)
+    }
+
     func load(for race: Race) {
         pause()
         stepIndex = 0
@@ -66,7 +73,7 @@ class HistoricalRaceViewModel: ObservableObject {
         fetchMeeting(circuitId: circuitId, year: yearInt)
     }
 
-    private func parseTrack(_ json: String?) {
+    func parseTrack(_ json: String?) {
         guard
             let json = json,
             let data = json.data(using: .utf8),
@@ -194,12 +201,16 @@ class HistoricalRaceViewModel: ObservableObject {
                         }
                     }
                     self.errorMessage = self.positions.isEmpty ? "Date de locație indisponibile" : nil
-                    let totalLocations = self.positions.values.reduce(0) { $0 + $1.count }
-                    if !self.hasInitialLocations, totalLocations >= 2 {
-                        self.calculateLocationBounds()
-                        self.updatePositions()
-                        self.hasInitialLocations = true
-                    } else if self.hasInitialLocations {
+                    if !self.hasInitialLocations {
+                        let allPoints = self.positions.values.flatMap { $0 }
+                        let uniqueXs = Set(allPoints.map { $0.x })
+                        let uniqueYs = Set(allPoints.map { $0.y })
+                        if uniqueXs.count > 1 && uniqueYs.count > 1 {
+                            self.calculateLocationBounds()
+                            self.updatePositions()
+                            self.hasInitialLocations = true
+                        }
+                    } else {
                         self.updatePositions()
                     }
                 }
@@ -221,7 +232,10 @@ class HistoricalRaceViewModel: ObservableObject {
         let maxX = xs.max() ?? 1
         let minY = ys.min() ?? 0
         let maxY = ys.max() ?? 1
-        locationBounds = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+        let width = maxX - minX
+        let height = maxY - minY
+        guard width > 0 && height > 0 else { return }
+        locationBounds = CGRect(x: minX, y: minY, width: width, height: height)
 
         let trackCenter = CGPoint(x: trackBounds.midX, y: trackBounds.midY)
         let locCenter = CGPoint(x: locationBounds.midX, y: locationBounds.midY)
@@ -246,7 +260,11 @@ class HistoricalRaceViewModel: ObservableObject {
         let transformed = CGPoint(x: loc.x, y: loc.y).applying(locationTransform)
         let nx = (transformed.x - trackBounds.minX) / trackBounds.width
         let ny = 1 - (transformed.y - trackBounds.minY) / trackBounds.height
-        return CGPoint(x: nx * size.width, y: ny * size.height)
+        let point = CGPoint(x: nx * size.width, y: ny * size.height)
+        if point.x < 0 || point.x > size.width || point.y < 0 || point.y > size.height {
+            errorMessage = "Puncte în afara Canvasului"
+        }
+        return point
     }
 
     func start() {
@@ -269,11 +287,16 @@ class HistoricalRaceViewModel: ObservableObject {
         timer = nil
     }
 
+    deinit {
+        timer?.invalidate()
+    }
+
     var maxSteps: Int {
         positions.values.map { $0.count }.max() ?? 0
     }
 
     func updatePositions() {
+        errorMessage = nil
         for driver in drivers {
             if let arr = positions[driver.driver_number], stepIndex < arr.count {
                 currentPosition[driver.driver_number] = arr[stepIndex]
