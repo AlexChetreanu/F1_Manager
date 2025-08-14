@@ -44,15 +44,20 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var sessionKey: Int?
     @Published var sessionStart: String?
     @Published var sessionEnd: String?
+    @Published var stepIndex: Int = 0
 
     private var timer: Timer?
-    private var stepIndex = 0
     private var minX: Double = 0
     private var maxX: Double = 1
     private var minY: Double = 0
     private var maxY: Double = 1
+    private var locationFetchCount = 0
 
     func load(for race: Race) {
+        pause()
+        stepIndex = 0
+        positions.removeAll()
+        currentPosition.removeAll()
         parseTrack(race.coordinates)
         guard let circuitId = race.circuit_id, let yearInt = Int(year) else {
             errorMessage = "Selectează un an valid"
@@ -148,25 +153,26 @@ class HistoricalRaceViewModel: ObservableObject {
         let startStr = formatter.string(from: start)
         let endStr = formatter.string(from: end)
 
+        locationFetchCount = 0
         for driver in drivers {
             let urlString = "https://api.openf1.org/v1/location?session_key=\(sessionKey)&driver_number=\(driver.driver_number)&date>=\(startStr)&date<=\(endStr)"
             guard let encoded = urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
                   let url = URL(string: encoded) else { continue }
             URLSession.shared.dataTask(with: url) { data, _, error in
-                guard error == nil, let data = data else {
+                defer {
                     DispatchQueue.main.async {
-                        self.errorMessage = "Eroare la încărcarea pozițiilor"
+                        self.locationFetchCount += 1
+                        if self.locationFetchCount == self.drivers.count {
+                            self.errorMessage = self.positions.isEmpty ? "Date de locație indisponibile" : nil
+                            if !self.positions.isEmpty {
+                                self.updatePositions()
+                            }
+                        }
                     }
-                    return
                 }
-                guard let locs = try? JSONDecoder().decode([LocationPoint].self, from: data), !locs.isEmpty else {
-                    DispatchQueue.main.async {
-                        self.errorMessage = "Date de locație indisponibile"
-                    }
-                    return
-                }
+                guard error == nil, let data = data else { return }
+                guard let locs = try? JSONDecoder().decode([LocationPoint].self, from: data), !locs.isEmpty else { return }
                 DispatchQueue.main.async {
-                    self.errorMessage = nil
                     self.positions[driver.driver_number] = locs
                     self.currentPosition[driver.driver_number] = locs.first
                 }
@@ -185,10 +191,10 @@ class HistoricalRaceViewModel: ObservableObject {
         isRunning = true
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             self.stepIndex += 1
-            for driver in self.drivers {
-                if let arr = self.positions[driver.driver_number], self.stepIndex < arr.count {
-                    self.currentPosition[driver.driver_number] = arr[self.stepIndex]
-                }
+            if self.stepIndex >= self.maxSteps {
+                self.pause()
+            } else {
+                self.updatePositions()
             }
         }
     }
@@ -197,6 +203,18 @@ class HistoricalRaceViewModel: ObservableObject {
         isRunning = false
         timer?.invalidate()
         timer = nil
+    }
+
+    var maxSteps: Int {
+        positions.values.map { $0.count }.max() ?? 0
+    }
+
+    func updatePositions() {
+        for driver in drivers {
+            if let arr = positions[driver.driver_number], stepIndex < arr.count {
+                currentPosition[driver.driver_number] = arr[stepIndex]
+            }
+        }
     }
 
     private func year(from iso: String) -> Int {

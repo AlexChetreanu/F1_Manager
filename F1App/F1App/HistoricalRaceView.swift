@@ -56,6 +56,18 @@ struct HistoricalRaceView: View {
                 .cornerRadius(8)
                 .padding()
 
+                if viewModel.maxSteps > 1 {
+                    Slider(
+                        value: Binding(
+                            get: { Double(viewModel.stepIndex) },
+                            set: { viewModel.stepIndex = Int($0); viewModel.updatePositions() }
+                        ),
+                        in: 0...Double(viewModel.maxSteps - 1),
+                        step: 1
+                    )
+                    .padding(.horizontal)
+                }
+
                 Button(viewModel.isRunning ? "Pauză" : "Start") {
                     viewModel.isRunning ? viewModel.pause() : viewModel.start()
                 }
