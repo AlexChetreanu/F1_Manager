@@ -2,7 +2,7 @@ import SwiftUI
 
 struct HistoricalRaceView: View {
     let race: Race
-    @StateObject private var viewModel = HistoricalRaceViewModel()
+    @ObservedObject var viewModel: HistoricalRaceViewModel
 
     var body: some View {
         VStack {
@@ -22,7 +22,7 @@ struct HistoricalRaceView: View {
                     .padding(.bottom)
             }
 
-            if !viewModel.trackPoints.isEmpty && !viewModel.currentPosition.isEmpty {
+            if !viewModel.trackPoints.isEmpty {
                 GeometryReader { geo in
                     ZStack {
                         Path { path in
@@ -37,16 +37,18 @@ struct HistoricalRaceView: View {
                         }
                         .stroke(Color.blue, lineWidth: 2)
 
-                        ForEach(viewModel.drivers) { driver in
-                            if let loc = viewModel.currentPosition[driver.driver_number] {
-                                let point = viewModel.point(for: loc, in: geo.size)
-                                Circle()
-                                    .fill(Color.red)
-                                    .frame(width: 8, height: 8)
-                                    .position(point)
-                                Text(driver.initials)
-                                    .font(.caption2)
-                                    .position(x: point.x, y: point.y - 10)
+                        if !viewModel.currentPosition.isEmpty {
+                            ForEach(viewModel.drivers) { driver in
+                                if let loc = viewModel.currentPosition[driver.driver_number] {
+                                    let point = viewModel.point(for: loc, in: geo.size)
+                                    Circle()
+                                        .fill(Color.red)
+                                        .frame(width: 8, height: 8)
+                                        .position(point)
+                                    Text(driver.initials)
+                                        .font(.caption2)
+                                        .position(x: point.x, y: point.y - 10)
+                                }
                             }
                         }
                     }
@@ -55,6 +57,12 @@ struct HistoricalRaceView: View {
                 .background(Color.gray.opacity(0.1))
                 .cornerRadius(8)
                 .padding()
+
+                if viewModel.currentPosition.isEmpty {
+                    Text("Date de locație indisponibile")
+                        .foregroundColor(.red)
+                        .padding(.bottom)
+                }
 
                 if viewModel.maxSteps > 1 {
                     Slider(
