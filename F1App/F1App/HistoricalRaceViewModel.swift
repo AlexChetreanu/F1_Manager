@@ -49,7 +49,6 @@ class HistoricalRaceViewModel: ObservableObject {
     private var timer: Timer?
     private var trackBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
-    private var locationTransform: CGAffineTransform = .identity
     private var isFetchingLocations = false
     private var hasInitialLocations = false
 
@@ -180,17 +179,7 @@ class HistoricalRaceViewModel: ObservableObject {
         URLSession.shared.dataTask(with: url) { data, _, error in
             if let data = data, error == nil,
                let locs = try? JSONDecoder().decode([LocationPoint].self, from: data) {
-                // Scale down coordinates by a factor of 10 to better fit the track
-                let scaledLocs = locs.map { original in
-                    LocationPoint(
-                        driver_number: original.driver_number,
-                        date: original.date,
-                        x: original.x / 10.0,
-                        y: original.y / 10.0
-                    )
-                }
-
-                let grouped = Dictionary(grouping: scaledLocs, by: { $0.driver_number })
+                let grouped = Dictionary(grouping: locs, by: { $0.driver_number })
 
                 DispatchQueue.main.async {
                     var exceededBounds = false
@@ -236,39 +225,20 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func calculateLocationBounds() {
-        let allPoints = positions.values.flatMap { $0 }
-        guard !allPoints.isEmpty else { return }
-        let xs = allPoints.map { $0.x }
-        let ys = allPoints.map { $0.y }
+        guard let sample = positions.values.first, !sample.isEmpty else { return }
+        let xs = sample.map { $0.x }
+        let ys = sample.map { $0.y }
         let minX = xs.min() ?? 0
         let maxX = xs.max() ?? 1
         let minY = ys.min() ?? 0
         let maxY = ys.max() ?? 1
         locationBounds = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
-
-        let trackCenter = CGPoint(x: trackBounds.midX, y: trackBounds.midY)
-        let locCenter = CGPoint(x: locationBounds.midX, y: locationBounds.midY)
-        let trackVector = CGPoint(x: trackBounds.maxX - trackBounds.minX, y: trackBounds.maxY - trackBounds.minY)
-        let locVector = CGPoint(x: locationBounds.maxX - locationBounds.minX, y: locationBounds.maxY - locationBounds.minY)
-        let trackAngle = atan2(trackVector.y, trackVector.x)
-        let locAngle = atan2(locVector.y, locVector.x)
-        let rotation = trackAngle - locAngle
-        let scaleX = trackBounds.width / locationBounds.width
-        let scaleY = trackBounds.height / locationBounds.height
-        let scale = min(scaleX, scaleY)
-
-        var t = CGAffineTransform.identity
-        t = t.translatedBy(x: -locCenter.x, y: -locCenter.y)
-        t = t.rotated(by: rotation)
-        t = t.scaledBy(x: scale, y: scale)
-        t = t.translatedBy(x: trackCenter.x, y: trackCenter.y)
-        locationTransform = t
     }
 
     public func point(for loc: LocationPoint, in size: CGSize) -> CGPoint {
-        let transformed = CGPoint(x: loc.x, y: loc.y).applying(locationTransform)
-        let rawX = (transformed.x - trackBounds.minX) / trackBounds.width
-        let rawY = 1 - (transformed.y - trackBounds.minY) / trackBounds.height
+        guard locationBounds.width != 0, locationBounds.height != 0 else { return .zero }
+        let rawX = (loc.x - locationBounds.minX) / locationBounds.width
+        let rawY = 1 - (loc.y - locationBounds.minY) / locationBounds.height
         let nx = max(0, min(rawX, 1))
         let ny = max(0, min(rawY, 1))
         return CGPoint(x: nx * size.width, y: ny * size.height)
