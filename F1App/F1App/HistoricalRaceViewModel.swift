@@ -51,7 +51,12 @@ class HistoricalRaceViewModel: ObservableObject {
     private var timer: Timer?
     private let speedOptions: [Double] = [1, 2, 5]
     private var speedIndex = 0
-    private let dateFormatter = ISO8601DateFormatter()
+    private let dateFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        return formatter
+    }()
     private var trackBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var isFetchingLocations = false
@@ -308,7 +313,8 @@ class HistoricalRaceViewModel: ObservableObject {
             if index + 1 < arr.count,
                let start = dateFormatter.date(from: arr[index].date),
                let end = dateFormatter.date(from: arr[index + 1].date) {
-                return end.timeIntervalSince(start)
+                let diff = end.timeIntervalSince(start)
+                if diff > 0 { return diff }
             }
         }
         return nil
