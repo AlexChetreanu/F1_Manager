@@ -76,6 +76,7 @@ struct CircuitView: View {
                         }
                     }
                 }
+                .animation(.linear(duration: 1), value: viewModel.stepIndex)
                 .background(Color.gray.opacity(0.1))
                 .cornerRadius(8)
             }
