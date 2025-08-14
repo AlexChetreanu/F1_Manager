@@ -32,6 +32,10 @@ struct SessionInfo: Decodable {
     let date_end: String?
 }
 
+struct PositionResult: Decodable {
+    let driver_number: Int
+}
+
 class HistoricalRaceViewModel: ObservableObject {
     @Published var year: String = ""
     @Published var errorMessage: String?
@@ -47,6 +51,7 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var stepIndex: Int = 0
     @Published var playbackSpeed: Double = 1.0
     @Published var currentStepDuration: Double = 1.0
+    @Published var startLocation: LocationPoint?
 
     private var timer: Timer?
     private let speedOptions: [Double] = [1, 2, 5]
@@ -61,6 +66,7 @@ class HistoricalRaceViewModel: ObservableObject {
     private var locationBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var isFetchingLocations = false
     private var hasInitialLocations = false
+    private var startDriverNumber: Int?
 
     func load(for race: Race) {
         pause()
@@ -132,6 +138,22 @@ class HistoricalRaceViewModel: ObservableObject {
                 self.sessionEnd = session.date_end
                 self.errorMessage = nil
                 self.fetchDrivers(meetingKey: meetingKey, sessionKey: session.session_key)
+                self.fetchStartDriver(meetingKey: meetingKey)
+            }
+        }.resume()
+    }
+
+    private func fetchStartDriver(meetingKey: Int) {
+        guard let url = URL(string: "https://api.openf1.org/v1/position?meeting_key=\(meetingKey)&position=1") else { return }
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            guard let data = data,
+                  let results = try? JSONDecoder().decode([PositionResult].self, from: data),
+                  let first = results.first else { return }
+            DispatchQueue.main.async {
+                self.startDriverNumber = first.driver_number
+                if let loc = self.positions[first.driver_number]?.first {
+                    self.startLocation = loc
+                }
             }
         }.resume()
     }
@@ -202,6 +224,12 @@ class HistoricalRaceViewModel: ObservableObject {
                             self.positions[driver.driver_number] = existing
                             if self.currentPosition[driver.driver_number] == nil {
                                 self.currentPosition[driver.driver_number] = existing.first
+                            }
+                            if let startDriver = self.startDriverNumber,
+                               self.startLocation == nil,
+                               driver.driver_number == startDriver,
+                               let first = existing.first {
+                                self.startLocation = first
                             }
                             if self.hasInitialLocations && !exceededBounds {
                                 for loc in sortedArr {
