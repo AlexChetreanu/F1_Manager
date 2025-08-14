@@ -63,6 +63,15 @@ struct CircuitView: View {
                     }
                     .stroke(Color.blue, lineWidth: 2)
 
+                    if let start = viewModel.startLocation {
+                        let p = viewModel.point(for: start, in: geo.size)
+                        Path { startPath in
+                            startPath.move(to: CGPoint(x: p.x, y: p.y - 10))
+                            startPath.addLine(to: CGPoint(x: p.x, y: p.y + 10))
+                        }
+                        .stroke(Color.green, lineWidth: 2)
+                    }
+
                     ForEach(viewModel.drivers) { driver in
                         if let loc = viewModel.currentPosition[driver.driver_number] {
                             let p = viewModel.point(for: loc, in: geo.size)
