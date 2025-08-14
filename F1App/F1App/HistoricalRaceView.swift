@@ -1,0 +1,122 @@
+import SwiftUI
+
+struct HistoricalRaceView: View {
+    let race: Race
+    @ObservedObject var viewModel: HistoricalRaceViewModel
+
+    var body: some View {
+        VStack {
+            HStack {
+                TextField("Anul", text: $viewModel.year)
+                    .keyboardType(.numberPad)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                Button("Caută") {
+                    viewModel.load(for: race)
+                }
+            }
+            .padding()
+
+            if let error = viewModel.errorMessage {
+                Text(error)
+                    .foregroundColor(.red)
+                    .padding(.bottom)
+            }
+
+            if !viewModel.trackPoints.isEmpty {
+                GeometryReader { geo in
+                    let bounds = CGRect(origin: .zero, size: geo.size)
+                    let outOfBounds = viewModel.drivers.contains { driver in
+                        if let loc = viewModel.currentPosition[driver.driver_number] {
+                            let p = viewModel.point(for: loc, in: geo.size)
+                            return !bounds.contains(p)
+                        }
+                        return false
+                    }
+
+                    ZStack {
+                        Path { path in
+                            guard let first = viewModel.trackPoints.first else { return }
+                            path.move(to: CGPoint(x: first.x * geo.size.width,
+                                                  y: first.y * geo.size.height))
+                            for p in viewModel.trackPoints.dropFirst() {
+                                path.addLine(to: CGPoint(x: p.x * geo.size.width,
+                                                         y: p.y * geo.size.height))
+                            }
+                            path.closeSubpath()
+                        }
+                        .stroke(Color.blue, lineWidth: 2)
+
+                        if !viewModel.currentPosition.isEmpty {
+                            ForEach(viewModel.drivers) { driver in
+                                if let loc = viewModel.currentPosition[driver.driver_number] {
+                                    let point = viewModel.point(for: loc, in: geo.size)
+                                    if bounds.contains(point) {
+                                        Circle()
+                                            .fill(Color.red)
+                                            .frame(width: 8, height: 8)
+                                            .position(point)
+                                        Text(driver.initials)
+                                            .font(.caption2)
+                                            .position(x: point.x, y: point.y - 10)
+                                    }
+                                }
+                            }
+                            if outOfBounds {
+                                Text("Puncte în afara circuitului")
+                                    .foregroundColor(.red)
+                                    .position(x: geo.size.width / 2, y: 20)
+                            }
+                        }
+                    }
+                }
+                .frame(height: 300)
+                .background(Color.gray.opacity(0.1))
+                .cornerRadius(8)
+                .padding()
+
+                if viewModel.currentPosition.isEmpty {
+                    Text("Date de locație indisponibile")
+                        .foregroundColor(.red)
+                        .padding(.bottom)
+                }
+
+                if viewModel.maxSteps > 1 {
+                    Slider(
+                        value: Binding(
+                            get: { Double(viewModel.stepIndex) },
+                            set: { viewModel.stepIndex = Int($0); viewModel.updatePositions() }
+                        ),
+                        in: 0...Double(viewModel.maxSteps - 1),
+                        step: 1
+                    )
+                    .padding(.horizontal)
+                }
+
+                Button(viewModel.isRunning ? "Pauză" : "Start") {
+                    viewModel.isRunning ? viewModel.pause() : viewModel.start()
+                }
+                .padding(.bottom)
+
+                List(viewModel.drivers) { driver in
+                    if let loc = viewModel.currentPosition[driver.driver_number] {
+                        HStack {
+                            Text(driver.full_name)
+                            Spacer()
+                            Text(String(format: "(%.2f, %.2f)", loc.x, loc.y))
+                                .font(.caption)
+                        }
+                    } else {
+                        HStack {
+                            Text(driver.full_name)
+                            Spacer()
+                            Text("N/A")
+                                .font(.caption)
+                        }
+                    }
+                }
+                .frame(maxHeight: 200)
+            }
+            Spacer()
+        }
+    }
+}
