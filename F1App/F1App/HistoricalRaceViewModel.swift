@@ -47,10 +47,9 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var stepIndex: Int = 0
 
     private var timer: Timer?
-    private var minX: Double = 0
-    private var maxX: Double = 1
-    private var minY: Double = 0
-    private var maxY: Double = 1
+    private var trackBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+    private var locationBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+    private var locationTransform: CGAffineTransform = .identity
     private var locationFetchCount = 0
 
     func load(for race: Race) {
@@ -75,13 +74,14 @@ class HistoricalRaceViewModel: ObservableObject {
 
         let xs = arr.map { $0[0] }
         let ys = arr.map { $0[1] }
-        minX = xs.min() ?? 0
-        maxX = xs.max() ?? 1
-        minY = ys.min() ?? 0
-        maxY = ys.max() ?? 1
+        let minX = xs.min() ?? 0
+        let maxX = xs.max() ?? 1
+        let minY = ys.min() ?? 0
+        let maxY = ys.max() ?? 1
+        trackBounds = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
         trackPoints = arr.map { point in
-            let x = (point[0] - minX) / (maxX - minX)
-            let y = 1 - (point[1] - minY) / (maxY - minY)
+            let x = (point[0] - trackBounds.minX) / trackBounds.width
+            let y = 1 - (point[1] - trackBounds.minY) / trackBounds.height
             return CGPoint(x: x, y: y)
         }
     }
@@ -165,6 +165,7 @@ class HistoricalRaceViewModel: ObservableObject {
                         if self.locationFetchCount == self.drivers.count {
                             self.errorMessage = self.positions.isEmpty ? "Date de locație indisponibile" : nil
                             if !self.positions.isEmpty {
+                                self.calculateLocationBounds()
                                 self.updatePositions()
                             }
                         }
@@ -180,9 +181,40 @@ class HistoricalRaceViewModel: ObservableObject {
         }
     }
 
+    private func calculateLocationBounds() {
+        let allPoints = positions.values.flatMap { $0 }
+        guard !allPoints.isEmpty else { return }
+        let xs = allPoints.map { $0.x }
+        let ys = allPoints.map { $0.y }
+        let minX = xs.min() ?? 0
+        let maxX = xs.max() ?? 1
+        let minY = ys.min() ?? 0
+        let maxY = ys.max() ?? 1
+        locationBounds = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+
+        let trackCenter = CGPoint(x: trackBounds.midX, y: trackBounds.midY)
+        let locCenter = CGPoint(x: locationBounds.midX, y: locationBounds.midY)
+        let trackVector = CGPoint(x: trackBounds.maxX - trackBounds.minX, y: trackBounds.maxY - trackBounds.minY)
+        let locVector = CGPoint(x: locationBounds.maxX - locationBounds.minX, y: locationBounds.maxY - locationBounds.minY)
+        let trackAngle = atan2(trackVector.y, trackVector.x)
+        let locAngle = atan2(locVector.y, locVector.x)
+        let rotation = trackAngle - locAngle
+        let scaleX = trackBounds.width / locationBounds.width
+        let scaleY = trackBounds.height / locationBounds.height
+        let scale = (scaleX + scaleY) / 2
+
+        var t = CGAffineTransform.identity
+        t = t.translatedBy(x: -locCenter.x, y: -locCenter.y)
+        t = t.rotated(by: rotation)
+        t = t.scaledBy(x: scale, y: scale)
+        t = t.translatedBy(x: trackCenter.x, y: trackCenter.y)
+        locationTransform = t
+    }
+
     func point(for loc: LocationPoint, in size: CGSize) -> CGPoint {
-        let nx = (loc.x - minX) / (maxX - minX)
-        let ny = 1 - (loc.y - minY) / (maxY - minY)
+        let transformed = CGPoint(x: loc.x, y: loc.y).applying(locationTransform)
+        let nx = (transformed.x - trackBounds.minX) / trackBounds.width
+        let ny = 1 - (transformed.y - trackBounds.minY) / trackBounds.height
         return CGPoint(x: nx * size.width, y: ny * size.height)
     }
 
