@@ -52,12 +52,14 @@ class HistoricalRaceViewModel: ObservableObject {
     private var locationTransform: CGAffineTransform = .identity
     private var isFetchingLocations = false
     private var hasInitialLocations = false
+    private var uniqueLocations: Set<(Double, Double)> = []
 
     func load(for race: Race) {
         pause()
         stepIndex = 0
         positions.removeAll()
         currentPosition.removeAll()
+        uniqueLocations.removeAll()
         parseTrack(race.coordinates)
         guard let circuitId = race.circuit_id, let yearInt = Int(year) else {
             errorMessage = "Selectează un an valid"
@@ -66,7 +68,7 @@ class HistoricalRaceViewModel: ObservableObject {
         fetchMeeting(circuitId: circuitId, year: yearInt)
     }
 
-    private func parseTrack(_ json: String?) {
+    func parseTrack(_ json: String?) {
         guard
             let json = json,
             let data = json.data(using: .utf8),
@@ -156,6 +158,7 @@ class HistoricalRaceViewModel: ObservableObject {
         currentPosition.removeAll()
         hasInitialLocations = false
         isFetchingLocations = true
+        uniqueLocations.removeAll()
 
         fetchLocationChunk(sessionKey: sessionKey, current: start, end: end, formatter: formatter)
     }
@@ -191,13 +194,17 @@ class HistoricalRaceViewModel: ObservableObject {
                             if self.currentPosition[driver.driver_number] == nil {
                                 self.currentPosition[driver.driver_number] = arr.first
                             }
+                            for point in arr {
+                                self.uniqueLocations.insert((point.x, point.y))
+                            }
                         }
                     }
                     self.errorMessage = self.positions.isEmpty ? "Date de locație indisponibile" : nil
-                    if !self.hasInitialLocations, !self.positions.isEmpty {
-                        self.calculateLocationBounds()
-                        self.updatePositions()
-                        self.hasInitialLocations = true
+                    if !self.hasInitialLocations, self.uniqueLocations.count >= 2 {
+                        if self.calculateLocationBounds() {
+                            self.updatePositions()
+                            self.hasInitialLocations = true
+                        }
                     } else if self.hasInitialLocations {
                         self.updatePositions()
                     }
@@ -211,15 +218,14 @@ class HistoricalRaceViewModel: ObservableObject {
         }.resume()
     }
 
-    private func calculateLocationBounds() {
+    private func calculateLocationBounds() -> Bool {
         let allPoints = positions.values.flatMap { $0 }
-        guard !allPoints.isEmpty else { return }
+        guard !allPoints.isEmpty else { return false }
         let xs = allPoints.map { $0.x }
         let ys = allPoints.map { $0.y }
-        let minX = xs.min() ?? 0
-        let maxX = xs.max() ?? 1
-        let minY = ys.min() ?? 0
-        let maxY = ys.max() ?? 1
+        guard let minX = xs.min(), let maxX = xs.max(),
+              let minY = ys.min(), let maxY = ys.max(),
+              maxX > minX, maxY > minY else { return false }
         locationBounds = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
 
         let trackCenter = CGPoint(x: trackBounds.midX, y: trackBounds.midY)
@@ -239,9 +245,10 @@ class HistoricalRaceViewModel: ObservableObject {
         t = t.scaledBy(x: scale, y: scale)
         t = t.translatedBy(x: trackCenter.x, y: trackCenter.y)
         locationTransform = t
+        return true
     }
 
-    func point(for loc: LocationPoint, in size: CGSize) -> CGPoint {
+    public func point(for loc: LocationPoint, in size: CGSize) -> CGPoint {
         let transformed = CGPoint(x: loc.x, y: loc.y).applying(locationTransform)
         let nx = (transformed.x - trackBounds.minX) / trackBounds.width
         let ny = 1 - (transformed.y - trackBounds.minY) / trackBounds.height
@@ -282,5 +289,11 @@ class HistoricalRaceViewModel: ObservableObject {
 
     private func year(from iso: String) -> Int {
         return Int(iso.prefix(4)) ?? 0
+    }
+
+    deinit {
+        timer?.invalidate()
+        timer = nil
+        isRunning = false
     }
 }
