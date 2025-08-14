@@ -72,6 +72,25 @@ struct HistoricalRaceView: View {
                     viewModel.isRunning ? viewModel.pause() : viewModel.start()
                 }
                 .padding(.bottom)
+
+                List(viewModel.drivers) { driver in
+                    if let loc = viewModel.currentPosition[driver.driver_number] {
+                        HStack {
+                            Text(driver.full_name)
+                            Spacer()
+                            Text(String(format: "(%.2f, %.2f)", loc.x, loc.y))
+                                .font(.caption)
+                        }
+                    } else {
+                        HStack {
+                            Text(driver.full_name)
+                            Spacer()
+                            Text("N/A")
+                                .font(.caption)
+                        }
+                    }
+                }
+                .frame(maxHeight: 200)
             }
             Spacer()
         }
