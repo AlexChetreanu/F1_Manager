@@ -24,6 +24,15 @@ struct HistoricalRaceView: View {
 
             if !viewModel.trackPoints.isEmpty {
                 GeometryReader { geo in
+                    let bounds = CGRect(origin: .zero, size: geo.size)
+                    let outOfBounds = viewModel.drivers.contains { driver in
+                        if let loc = viewModel.currentPosition[driver.driver_number] {
+                            let p = viewModel.point(for: loc, in: geo.size)
+                            return !bounds.contains(p)
+                        }
+                        return false
+                    }
+
                     ZStack {
                         Path { path in
                             guard let first = viewModel.trackPoints.first else { return }
@@ -41,14 +50,21 @@ struct HistoricalRaceView: View {
                             ForEach(viewModel.drivers) { driver in
                                 if let loc = viewModel.currentPosition[driver.driver_number] {
                                     let point = viewModel.point(for: loc, in: geo.size)
-                                    Circle()
-                                        .fill(Color.red)
-                                        .frame(width: 8, height: 8)
-                                        .position(point)
-                                    Text(driver.initials)
-                                        .font(.caption2)
-                                        .position(x: point.x, y: point.y - 10)
+                                    if bounds.contains(point) {
+                                        Circle()
+                                            .fill(Color.red)
+                                            .frame(width: 8, height: 8)
+                                            .position(point)
+                                        Text(driver.initials)
+                                            .font(.caption2)
+                                            .position(x: point.x, y: point.y - 10)
+                                    }
                                 }
+                            }
+                            if outOfBounds {
+                                Text("Puncte în afara circuitului")
+                                    .foregroundColor(.red)
+                                    .position(x: geo.size.width / 2, y: 20)
                             }
                         }
                     }
