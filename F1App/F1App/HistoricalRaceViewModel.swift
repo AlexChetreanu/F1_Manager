@@ -7,7 +7,7 @@ struct Meeting: Decodable {
     let date_start: String
 }
 
-struct DriverInfo: Identifiable, Decodable {
+struct DriverInfo: Identifiable, Decodable, Hashable {
     let driver_number: Int
     let full_name: String
 
@@ -131,8 +131,9 @@ class HistoricalRaceViewModel: ObservableObject {
         URLSession.shared.dataTask(with: url) { data, _, _ in
             guard let data = data,
                   let drivers = try? JSONDecoder().decode([DriverInfo].self, from: data) else { return }
+            let uniqueDrivers = Array(Set(drivers))
             DispatchQueue.main.async {
-                self.drivers = drivers
+                self.drivers = uniqueDrivers
                 self.fetchLocations(sessionKey: sessionKey)
             }
         }.resume()
