@@ -180,7 +180,17 @@ class HistoricalRaceViewModel: ObservableObject {
         URLSession.shared.dataTask(with: url) { data, _, error in
             if let data = data, error == nil,
                let locs = try? JSONDecoder().decode([LocationPoint].self, from: data) {
-                let grouped = Dictionary(grouping: locs, by: { $0.driver_number })
+                // Scale down coordinates by a factor of 10 to better fit the track
+                let scaledLocs = locs.map { original in
+                    LocationPoint(
+                        driver_number: original.driver_number,
+                        date: original.date,
+                        x: original.x / 10.0,
+                        y: original.y / 10.0
+                    )
+                }
+
+                let grouped = Dictionary(grouping: scaledLocs, by: { $0.driver_number })
 
                 DispatchQueue.main.async {
                     var exceededBounds = false
