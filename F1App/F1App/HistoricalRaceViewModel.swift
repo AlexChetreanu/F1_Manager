@@ -50,7 +50,6 @@ class HistoricalRaceViewModel: ObservableObject {
     private var trackBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationTransform: CGAffineTransform = .identity
-    private var locationFetchCount = 0
 
     func load(for race: Race) {
         pause()
@@ -154,32 +153,32 @@ class HistoricalRaceViewModel: ObservableObject {
         let startStr = formatter.string(from: start)
         let endStr = formatter.string(from: end)
 
-        locationFetchCount = 0
-        for driver in drivers {
-            let urlString = "https://api.openf1.org/v1/location?session_key=\(sessionKey)&driver_number=\(driver.driver_number)&date>=\(startStr)&date<=\(endStr)"
-            guard let encoded = urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-                  let url = URL(string: encoded) else { continue }
-            URLSession.shared.dataTask(with: url) { data, _, error in
-                defer {
-                    DispatchQueue.main.async {
-                        self.locationFetchCount += 1
-                        if self.locationFetchCount == self.drivers.count {
-                            self.errorMessage = self.positions.isEmpty ? "Date de locație indisponibile" : nil
-                            if !self.positions.isEmpty {
-                                self.calculateLocationBounds()
-                                self.updatePositions()
-                            }
-                        }
+        let urlString = "https://api.openf1.org/v1/location?session_key=\(sessionKey)&date>=\(startStr)&date<=\(endStr)"
+        guard let encoded = urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              let url = URL(string: encoded) else { return }
+
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            guard error == nil, let data = data else { return }
+            guard let locs = try? JSONDecoder().decode([LocationPoint].self, from: data) else { return }
+
+            let grouped = Dictionary(grouping: locs, by: { $0.driver_number })
+
+            DispatchQueue.main.async {
+                self.positions.removeAll()
+                self.currentPosition.removeAll()
+                for driver in self.drivers {
+                    if let arr = grouped[driver.driver_number], !arr.isEmpty {
+                        self.positions[driver.driver_number] = arr
+                        self.currentPosition[driver.driver_number] = arr.first
                     }
                 }
-                guard error == nil, let data = data else { return }
-                guard let locs = try? JSONDecoder().decode([LocationPoint].self, from: data), !locs.isEmpty else { return }
-                DispatchQueue.main.async {
-                    self.positions[driver.driver_number] = locs
-                    self.currentPosition[driver.driver_number] = locs.first
+                self.errorMessage = self.positions.isEmpty ? "Date de locație indisponibile" : nil
+                if !self.positions.isEmpty {
+                    self.calculateLocationBounds()
+                    self.updatePositions()
                 }
-            }.resume()
-        }
+            }
+        }.resume()
     }
 
     private func calculateLocationBounds() {
