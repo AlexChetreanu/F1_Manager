@@ -28,6 +28,8 @@ struct LocationPoint: Decodable {
 struct SessionInfo: Decodable {
     let session_key: Int
     let session_name: String
+    let date_start: String?
+    let date_end: String?
 }
 
 class HistoricalRaceViewModel: ObservableObject {
@@ -40,6 +42,8 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var isRunning = false
     @Published var trackPoints: [CGPoint] = []
     @Published var sessionKey: Int?
+    @Published var sessionStart: String?
+    @Published var sessionEnd: String?
 
     private var timer: Timer?
     private var stepIndex = 0
@@ -109,6 +113,8 @@ class HistoricalRaceViewModel: ObservableObject {
             }
             DispatchQueue.main.async {
                 self.sessionKey = session.session_key
+                self.sessionStart = session.date_start
+                self.sessionEnd = session.date_end
                 self.errorMessage = nil
                 self.fetchDrivers(meetingKey: meetingKey, sessionKey: session.session_key)
             }
@@ -128,10 +134,17 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func fetchLocations(sessionKey: Int) {
-        guard let meeting = meeting else { return }
         let formatter = ISO8601DateFormatter()
-        guard let start = formatter.date(from: meeting.date_start) else { return }
-        let end = start.addingTimeInterval(3 * 60 * 60)
+        guard let startString = sessionStart,
+              let start = formatter.date(from: startString) else { return }
+
+        let end: Date
+        if let endString = sessionEnd, let endDate = formatter.date(from: endString) {
+            end = endDate
+        } else {
+            end = start.addingTimeInterval(3 * 60 * 60)
+        }
+
         let startStr = formatter.string(from: start)
         let endStr = formatter.string(from: end)
 
