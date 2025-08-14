@@ -68,7 +68,7 @@ struct HistoricalRaceView: View {
                             }
                         }
                     }
-                    .animation(.linear(duration: 1), value: viewModel.stepIndex)
+                    .animation(.linear(duration: viewModel.currentStepDuration), value: viewModel.stepIndex)
                 }
                 .frame(height: 300)
                 .background(Color.gray.opacity(0.1))
@@ -93,8 +93,13 @@ struct HistoricalRaceView: View {
                     .padding(.horizontal)
                 }
 
-                Button(viewModel.isRunning ? "Pauză" : "Start") {
-                    viewModel.isRunning ? viewModel.pause() : viewModel.start()
+                HStack {
+                    Button(viewModel.isRunning ? "Pauză" : "Start") {
+                        viewModel.isRunning ? viewModel.pause() : viewModel.start()
+                    }
+                    Button("Viteză x\(Int(viewModel.playbackSpeed))") {
+                        viewModel.cycleSpeed()
+                    }
                 }
                 .padding(.bottom)
 
