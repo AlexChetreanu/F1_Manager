@@ -27,9 +27,7 @@ struct RaceDetailView: View {
             Spacer()
             
             if selectedTab == 0 {
-                CircuitView(coordinatesJSON: race.coordinates,
-                            drivers: viewModel.drivers,
-                            driverPositions: viewModel.currentPosition)
+                CircuitView(coordinatesJSON: race.coordinates, viewModel: viewModel)
                     .frame(height: UIScreen.main.bounds.height / 2)
                     .padding()
             } else if selectedTab == 1 {

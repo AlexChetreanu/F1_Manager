@@ -194,7 +194,8 @@ class HistoricalRaceViewModel: ObservableObject {
                         }
                     }
                     self.errorMessage = self.positions.isEmpty ? "Date de locație indisponibile" : nil
-                    if !self.hasInitialLocations, !self.positions.isEmpty {
+                    let totalLocations = self.positions.values.reduce(0) { $0 + $1.count }
+                    if !self.hasInitialLocations, totalLocations >= 2 {
                         self.calculateLocationBounds()
                         self.updatePositions()
                         self.hasInitialLocations = true
@@ -241,7 +242,7 @@ class HistoricalRaceViewModel: ObservableObject {
         locationTransform = t
     }
 
-    func point(for loc: LocationPoint, in size: CGSize) -> CGPoint {
+    public func point(for loc: LocationPoint, in size: CGSize) -> CGPoint {
         let transformed = CGPoint(x: loc.x, y: loc.y).applying(locationTransform)
         let nx = (transformed.x - trackBounds.minX) / trackBounds.width
         let ny = 1 - (transformed.y - trackBounds.minY) / trackBounds.height
