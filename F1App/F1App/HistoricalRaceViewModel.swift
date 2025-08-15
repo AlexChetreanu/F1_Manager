@@ -11,6 +11,7 @@ struct DriverInfo: Identifiable, Decodable, Hashable {
     let driver_number: Int
     let full_name: String
     let team_color: String?
+    let team_name: String?
 
     var id: Int { driver_number }
     var initials: String {
@@ -22,6 +23,7 @@ struct DriverInfo: Identifiable, Decodable, Hashable {
         case driver_number
         case full_name
         case team_color = "team_colour"
+        case team_name
     }
 }
 
