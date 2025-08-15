@@ -31,6 +31,9 @@ struct DriverDetailView: View {
             .padding()
         }
         .navigationTitle(driver.initials)
+        .onAppear {
+            viewModel.fetchData()
+        }
     }
 }
 
@@ -50,7 +53,6 @@ class DriverDetailViewModel: ObservableObject {
     init(driver: DriverInfo, sessionKey: Int?) {
         self.driverNumber = driver.driver_number
         self.sessionKey = sessionKey
-        fetchData()
     }
 
     func fetchData() {
