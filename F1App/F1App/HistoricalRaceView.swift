@@ -52,7 +52,7 @@ struct HistoricalRaceView: View {
                                     let point = viewModel.point(for: loc, in: geo.size)
                                     if bounds.contains(point) {
                                         Circle()
-                                            .fill(Color.red)
+                                            .fill(Color(hex: driver.team_color ?? "FF0000"))
                                             .frame(width: 8, height: 8)
                                             .position(point)
                                         Text(driver.initials)
