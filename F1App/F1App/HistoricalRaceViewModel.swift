@@ -10,11 +10,18 @@ struct Meeting: Decodable {
 struct DriverInfo: Identifiable, Decodable, Hashable {
     let driver_number: Int
     let full_name: String
+    let team_color: String?
 
     var id: Int { driver_number }
     var initials: String {
         let parts = full_name.split(separator: " ")
         return parts.compactMap { $0.first }.map { String($0) }.joined()
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case driver_number
+        case full_name
+        case team_color = "team_colour"
     }
 }
 
