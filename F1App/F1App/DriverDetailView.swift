@@ -25,8 +25,8 @@ struct DriverDetailView: View {
                 Text("Speed: \(viewModel.speed)")
                 Text("Brake: \(viewModel.brake)")
                 Text("Number of laps: \(viewModel.numberOfLaps)")
-                Text("DSQ: \(viewModel.dsq ? \"Yes\" : \"No\")")
-                Text("Compound: \(viewModel.compound)")
+           //     Text("DSQ: \(viewModel.dsq ? \"Yes\" : \"No\")")
+           //     Text("Compound: \(viewModel.compound)")
             }
             .padding()
         }
