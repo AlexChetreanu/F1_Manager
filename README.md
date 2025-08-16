@@ -13,8 +13,13 @@ pip install -r openf1_api/requirements.txt
 uvicorn openf1_api.main:app --reload
 ```
 
-The API exposes two endpoints:
+The API exposes endpoints for each table in `openf1.db`. The following paths are
+available and mirror the OpenF1 dataset:
 
-* `/sessions` – list available session keys.
-* `/events` – retrieve raw event rows filtered by `session_key`, optional `endpoint`,
-  and an optional `limit` (default 100).
+`/car_data`, `/drivers`, `/intervals`, `/laps`, `/location`, `/meetings`,
+`/overtakes`, `/pit`, `/position`, `/race_control`, `/sessions`, `/session_result`,
+`/starting_grid`, `/stints`, `/team_radio`, and `/weather`.
+
+Every endpoint accepts arbitrary query parameters that match column names in the
+underlying table for filtering. A `limit` parameter (default `100`) controls the
+maximum number of rows returned.
