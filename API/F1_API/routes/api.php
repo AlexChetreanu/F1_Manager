@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\DriverController;
 use App\Http\Controllers\RaceController;
+use App\Http\Controllers\OpenF1Controller;
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
@@ -19,4 +20,6 @@ Route::middleware('auth:sanctum')->put('/password', [PasswordController::class, 
 Route::get('/drivers', [DriverController::class, 'index']);
 
 Route::get('/races', [RaceController::class, 'apiIndex'])->name('races.api');
+
+Route::get('/openf1/{table}', [OpenF1Controller::class, 'query']);
 
