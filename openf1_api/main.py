@@ -1,21 +1,29 @@
-import json
 import sqlite3
-from typing import List, Optional
+from typing import Dict, List
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, Request
 
 DB_PATH = "openf1.db"
+ALLOWED_TABLES = {
+    "car_data",
+    "drivers",
+    "intervals",
+    "laps",
+    "location",
+    "meetings",
+    "overtakes",
+    "pit",
+    "position",
+    "race_control",
+    "sessions",
+    "session_result",
+    "starting_grid",
+    "stints",
+    "team_radio",
+    "weather",
+}
 
 app = FastAPI(title="OpenF1 API")
-
-
-class RawEvent(BaseModel):
-    endpoint: str
-    session_key: int
-    time_field: str
-    time_value: str
-    payload: dict
 
 
 def get_connection() -> sqlite3.Connection:
@@ -24,59 +32,55 @@ def get_connection() -> sqlite3.Connection:
     return conn
 
 
-@app.get("/sessions")
-def list_sessions() -> dict:
-    """Return available session keys."""
-    conn = get_connection()
-    cur = conn.execute("SELECT DISTINCT session_key FROM raw_events ORDER BY session_key")
-    sessions = [row[0] for row in cur.fetchall()]
-    conn.close()
-    return {"sessions": sessions}
+def get_columns(conn: sqlite3.Connection, table: str) -> List[str]:
+    cur = conn.execute(f"PRAGMA table_info({table})")
+    return [row[1] for row in cur.fetchall()]
 
 
-@app.get("/events", response_model=List[RawEvent])
-def read_events(
-    session_key: int,
-    endpoint: Optional[str] = None,
-    limit: int = 100,
-) -> List[RawEvent]:
-    """Retrieve raw events for a session.
+@app.get("/{endpoint}")
+async def read_table(endpoint: str, request: Request, limit: int = 100) -> List[Dict[str, object]]:
+    """Generic endpoint returning rows from a table in ``openf1.db``.
 
     Parameters
     ----------
-    session_key: int
-        Session identifier from the OpenF1 dataset.
-    endpoint: str, optional
-        Filter results to a specific endpoint, e.g. "car_data".
+    endpoint: str
+        Name of the table to query. Must be one of the tables from the
+        OpenF1 dataset.
+    request: Request
+        Incoming HTTP request used to read arbitrary query parameters for
+        filtering the results.
     limit: int
-        Maximum number of rows to return.
+        Maximum number of rows to return. Defaults to 100.
     """
+    if endpoint not in ALLOWED_TABLES:
+        raise HTTPException(status_code=404, detail="Unknown endpoint")
+
     conn = get_connection()
-    query = (
-        "SELECT endpoint, session_key, time_field, time_value, payload "
-        "FROM raw_events WHERE session_key = ?"
-    )
-    params: List[object] = [session_key]
-    if endpoint:
-        query += " AND endpoint = ?"
-        params.append(endpoint)
-    query += " ORDER BY time_value LIMIT ?"
+    columns = get_columns(conn, endpoint)
+
+    filters: Dict[str, str] = {k: v for k, v in request.query_params.items() if k != "limit"}
+    where_clauses: List[str] = []
+    params: List[object] = []
+    for key, value in filters.items():
+        if key not in columns:
+            conn.close()
+            raise HTTPException(status_code=400, detail=f"Unknown filter '{key}'")
+        where_clauses.append(f"{key} = ?")
+        params.append(value)
+
+    query = f"SELECT * FROM {endpoint}"
+    if where_clauses:
+        query += " WHERE " + " AND ".join(where_clauses)
+    query += " LIMIT ?"
     params.append(limit)
+
     cur = conn.execute(query, params)
-    rows = cur.fetchall()
+    rows = [dict(row) for row in cur.fetchall()]
     conn.close()
+
     if not rows:
-        raise HTTPException(status_code=404, detail="No events found")
-    return [
-        RawEvent(
-            endpoint=row["endpoint"],
-            session_key=row["session_key"],
-            time_field=row["time_field"],
-            time_value=row["time_value"],
-            payload=json.loads(row["payload"]),
-        )
-        for row in rows
-    ]
+        raise HTTPException(status_code=404, detail="No data found")
+    return rows
 
 
 if __name__ == "__main__":
