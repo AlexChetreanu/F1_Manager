@@ -82,7 +82,7 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func fetchMeeting(year: Int, circuitKey: Int) {
-        var comps = URLComponents(string: "http://127.0.0.1:8000/api/openf1/meetings")!
+        var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/meetings")!
         comps.queryItems = [
             URLQueryItem(name: "year", value: String(year)),
             URLQueryItem(name: "circuit_key", value: String(circuitKey))
@@ -133,7 +133,7 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func resolveSession(meetingKey: Int, year: Int) {
-        var comps = URLComponents(string: "http://127.0.0.1:8000/api/live/resolve")!
+        var comps = URLComponents(string: "\(APIConfig.baseURL)/api/live/resolve")!
         comps.queryItems = [
             URLQueryItem(name: "year", value: String(year)),
             URLQueryItem(name: "meeting_key", value: String(meetingKey)),
@@ -165,7 +165,7 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func fetchDrivers(meetingKey: Int, sessionKey: Int) {
-        var comps = URLComponents(string: "http://127.0.0.1:8000/api/openf1/drivers")!
+        var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/drivers")!
         comps.queryItems = [URLQueryItem(name: "meeting_key", value: String(meetingKey))]
         guard let url = comps.url else { return }
         URLSession.shared.dataTask(with: url) { data, _, _ in
@@ -193,7 +193,7 @@ class HistoricalRaceViewModel: ObservableObject {
         let endStr = formatter.string(from: end)
         locationFetchCount = 0
         for driver in drivers {
-            var comps = URLComponents(string: "http://127.0.0.1:8000/api/openf1/location")!
+            var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/location")!
             comps.queryItems = [
                 URLQueryItem(name: "session_key", value: String(sessionKey)),
                 URLQueryItem(name: "driver_number", value: String(driver.driver_number)),
