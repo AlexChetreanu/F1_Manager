@@ -69,7 +69,7 @@ class HistoricalRaceViewModel: ObservableObject {
             errorMessage = "Selectează un an valid"
             return
         }
-        resolveSession(meetingName: race.name, year: yearInt)
+        resolveSession(meetingKey: race.meeting_key, year: yearInt)
     }
 
     private func parseTrack(_ json: String?) {
@@ -99,11 +99,15 @@ class HistoricalRaceViewModel: ObservableObject {
         let date_end: String?
     }
 
-    private func resolveSession(meetingName: String, year: Int) {
+    private func resolveSession(meetingKey: Int?, year: Int) {
+        guard let meetingKey = meetingKey else {
+            errorMessage = "Lipsește meeting_key"
+            return
+        }
         var comps = URLComponents(string: "http://localhost:8000/api/live/resolve")!
         comps.queryItems = [
             URLQueryItem(name: "year", value: String(year)),
-            URLQueryItem(name: "meeting_name", value: meetingName),
+            URLQueryItem(name: "meeting_key", value: String(meetingKey)),
             URLQueryItem(name: "session_type", value: "Race")
         ]
         guard let url = comps.url else { return }
