@@ -114,19 +114,13 @@ return [
 
         'openf1' => [
             'driver' => env('DB_OPENF1_CONNECTION', 'sqlite'),
+            'url' => env('DB_OPENF1_URL'), // opțional
             'database' => env('DB_OPENF1_DATABASE', database_path('openf1.sqlite')),
             'prefix' => '',
-            'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
+            'foreign_key_constraints' => true,
         ],
 
-        'f1_openf1' => [
-            'db' => [
-                'driver' => env('DB_F1_OPENF1_CONNECTION', 'sqlite'),
-                'database' => env('DB_F1_OPENF1_DATABASE', database_path('f1_openf1.db')),
-                'prefix' => '',
-                'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            ],
-        ],
+
 
     ],
 

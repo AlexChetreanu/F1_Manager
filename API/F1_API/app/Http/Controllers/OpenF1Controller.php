@@ -25,11 +25,11 @@ class OpenF1Controller extends Controller
             return response()->json(['error' => 'Resource not allowed'], 404);
         }
 
-        if (! Schema::connection('f1_openf1.db')->hasTable($table)) {
+        if (! Schema::connection('openf1')->hasTable($table)) {
             return response()->json(['error' => 'Table not found'], 404);
         }
 
-        $schema = Schema::connection('f1_openf1.db');
+        $schema = Schema::connection('openf1.db');
         $columnsListing = $schema->getColumnListing($table);
 
         // Columns selection
@@ -46,7 +46,7 @@ class OpenF1Controller extends Controller
             }
         }
 
-        $query = DB::connection('f1_openf1.db')->table($table);
+        $query = DB::connection('openf1')->table($table);
 
         // Filters
         $reserved = ['limit', 'offset', 'order_by', 'format', 'columns', 'include_total'];
