@@ -30,6 +30,7 @@ struct LocationPoint: Decodable {
 }
 
 class HistoricalRaceViewModel: ObservableObject {
+    @Published var year: String = ""
     @Published var errorMessage: String?
     @Published var drivers: [DriverInfo] = []
     @Published var positions: [Int: [LocationPoint]] = [:]
@@ -64,11 +65,11 @@ class HistoricalRaceViewModel: ObservableObject {
         positions.removeAll()
         currentPosition.removeAll()
         parseTrack(race.coordinates)
-        guard let circuitId = race.circuit_id else {
-            errorMessage = "ID circuit indisponibil"
+        guard let yearInt = Int(year) else {
+            errorMessage = "Selectează un an valid"
             return
         }
-        resolveSession(circuitId: circuitId, date: race.date)
+        resolveSession(meetingName: race.name, year: yearInt)
     }
 
     private func parseTrack(_ json: String?) {
@@ -98,11 +99,11 @@ class HistoricalRaceViewModel: ObservableObject {
         let date_end: String?
     }
 
-    private func resolveSession(circuitId: String, date: String) {
+    private func resolveSession(meetingName: String, year: Int) {
         var comps = URLComponents(string: "http://localhost:8000/api/live/resolve")!
         comps.queryItems = [
-            URLQueryItem(name: "circuit_id", value: circuitId),
-            URLQueryItem(name: "date", value: date),
+            URLQueryItem(name: "year", value: String(year)),
+            URLQueryItem(name: "meeting_name", value: meetingName),
             URLQueryItem(name: "session_type", value: "Race")
         ]
         guard let url = comps.url else { return }
@@ -322,5 +323,8 @@ class HistoricalRaceViewModel: ObservableObject {
         return nil
     }
 
+    private func year(from iso: String) -> Int {
+        return Int(iso.prefix(4)) ?? 0
+    }
 }
 
