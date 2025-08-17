@@ -80,6 +80,10 @@ class HistoricalRaceViewModel: ObservableObject {
         let meeting_key: Int
     }
 
+    private struct MeetingsResponse: Decodable {
+        let data: [Meeting]
+    }
+
     private func fetchMeeting(year: Int, circuitKey: Int) {
         var comps = URLComponents(string: "http://127.0.0.1:8000/api/openf1/meetings")!
         comps.queryItems = [
@@ -88,9 +92,12 @@ class HistoricalRaceViewModel: ObservableObject {
         ]
         guard let url = comps.url else { return }
         URLSession.shared.dataTask(with: url) { data, _, _ in
-            guard let data = data,
-                  let meetings = try? JSONDecoder().decode([Meeting].self, from: data),
-                  let meeting = meetings.first else {
+            guard let data = data else {
+                DispatchQueue.main.async { self.errorMessage = "Nu am găsit cursa" }
+                return
+            }
+            let response = try? JSONDecoder().decode(MeetingsResponse.self, from: data)
+            guard let meeting = response?.data.first else {
                 DispatchQueue.main.async { self.errorMessage = "Nu am găsit cursa" }
                 return
             }
