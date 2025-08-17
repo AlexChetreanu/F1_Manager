@@ -9,7 +9,6 @@ struct Race: Identifiable, Decodable {
     let id: Int
     let name: String
     let circuit_id: String?
-    let meeting_key: Int?
     let location: String
     let date: String
     let status: String

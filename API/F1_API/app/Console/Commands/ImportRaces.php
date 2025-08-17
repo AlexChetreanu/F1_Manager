@@ -39,16 +39,6 @@ class ImportRaces extends Command
                 ? Carbon::parse($race['date'])
                 : now();
             $status = $date->isFuture() ? 'upcoming' : 'finished';
-            $meetingKey = DB::connection('openf1')
-                ->table('meetings')
-                ->where('year', $date->year)
-                ->whereRaw('LOWER(meeting_name) LIKE ?', ['%' . strtolower($race['name']) . '%'])
-                ->value('meeting_key');
-
-            if (! $meetingKey) {
-                $this->warn("Meeting key not found for {$race['name']}.");
-            }
-
             $this->info("Saving race: " . $race['name']);
 
             DB::table('races')->updateOrInsert(
@@ -59,7 +49,6 @@ class ImportRaces extends Command
                     'date' => $date,
                     'status' => $status,
                     'coordinates' => $coordinates,
-                    'meeting_key' => $meetingKey,
                     'updated_at' => now(),
                     'created_at' => now(),
                 ]
