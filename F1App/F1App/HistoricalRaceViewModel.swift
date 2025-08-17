@@ -69,7 +69,36 @@ class HistoricalRaceViewModel: ObservableObject {
             errorMessage = "Selectează un an valid"
             return
         }
-        resolveSession(meetingName: race.name, year: yearInt)
+        guard let circuitId = race.circuit_id, let circuitKey = Int(circuitId) else {
+            errorMessage = "Lipsește circuit_id"
+            return
+        }
+        fetchMeeting(year: yearInt, circuitKey: circuitKey)
+    }
+
+    private struct Meeting: Decodable {
+        let meeting_key: Int
+    }
+
+    private func fetchMeeting(year: Int, circuitKey: Int) {
+        var comps = URLComponents(string: "http://127.0.0.1:8000/api/openf1/meetings")!
+        comps.queryItems = [
+            URLQueryItem(name: "year", value: String(year)),
+            URLQueryItem(name: "circuit_key", value: String(circuitKey))
+        ]
+        guard let url = comps.url else { return }
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            guard let data = data,
+                  let meetings = try? JSONDecoder().decode([Meeting].self, from: data),
+                  let meeting = meetings.first else {
+                DispatchQueue.main.async { self.errorMessage = "Nu am găsit cursa" }
+                return
+            }
+            DispatchQueue.main.async {
+                self.errorMessage = nil
+                self.resolveSession(meetingKey: meeting.meeting_key, year: year)
+            }
+        }.resume()
     }
 
     private func parseTrack(_ json: String?) {
@@ -99,11 +128,11 @@ class HistoricalRaceViewModel: ObservableObject {
         let date_end: String?
     }
 
-    private func resolveSession(meetingName: String, year: Int) {
-        var comps = URLComponents(string: "http://localhost:8000/api/live/resolve")!
+    private func resolveSession(meetingKey: Int, year: Int) {
+        var comps = URLComponents(string: "http://127.0.0.1:8000/api/live/resolve")!
         comps.queryItems = [
             URLQueryItem(name: "year", value: String(year)),
-            URLQueryItem(name: "meeting_name", value: meetingName),
+            URLQueryItem(name: "meeting_key", value: String(meetingKey)),
             URLQueryItem(name: "session_type", value: "Race")
         ]
         guard let url = comps.url else { return }
