@@ -2,13 +2,14 @@
 
 namespace App\Console\Commands;
 
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 class ImportRaces extends Command
 {
     protected $signature = 'import:races';
+
     protected $description = 'Import F1 races with details and coordinates from local JSON files';
 
     public function handle()
@@ -19,7 +20,7 @@ class ImportRaces extends Command
         $races = json_decode(file_get_contents($jsonPath), true);
 
         foreach ($races as $race) {
-            $circuitId = $race['id']; // ex: it-1922
+            $circuitId = $race['circuit_id'] ?? $race['id'];
             $geoJsonPath = storage_path("app/data/circuits/{$circuitId}.geojson");
 
             $coordinates = null;
@@ -33,13 +34,13 @@ class ImportRaces extends Command
             } else {
                 $this->warn("Fișierul GEOJSON lipsește pentru {$circuitId}");
             }
-            $this->info('Număr curse în JSON: ' . count($races));
+            $this->info('Număr curse în JSON: '.count($races));
 
             $date = isset($race['date'])
                 ? Carbon::parse($race['date'])
                 : now();
             $status = $date->isFuture() ? 'upcoming' : 'finished';
-            $this->info("Saving race: " . $race['name']);
+            $this->info('Saving race: '.$race['name']);
 
             DB::table('races')->updateOrInsert(
                 ['circuit_id' => $circuitId],
