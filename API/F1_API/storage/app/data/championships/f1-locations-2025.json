@@ -1,6 +1,7 @@
 [
   {
     "id": "australian-grand-prix",
+    "circuit_id": "albert_park",
     "name": "Australian Grand Prix",
     "country": "Australia",
     "location": "Albert Park Circuit, Melbourne",
@@ -8,6 +9,7 @@
   },
   {
     "id": "chinese-grand-prix",
+    "circuit_id": "shanghai",
     "name": "Chinese Grand Prix",
     "country": "China",
     "location": "Shanghai International Circuit, Shanghai",
@@ -15,6 +17,7 @@
   },
   {
     "id": "japanese-grand-prix",
+    "circuit_id": "suzuka",
     "name": "Japanese Grand Prix",
     "country": "Japan",
     "location": "Suzuka Circuit, Suzuka",
@@ -22,6 +25,7 @@
   },
   {
     "id": "bahrain-grand-prix",
+    "circuit_id": "bahrain",
     "name": "Bahrain Grand Prix",
     "country": "Bahrain",
     "location": "Bahrain International Circuit, Sakhir",
@@ -29,6 +33,7 @@
   },
   {
     "id": "saudi-arabian-grand-prix",
+    "circuit_id": "jeddah",
     "name": "Saudi Arabian Grand Prix",
     "country": "Saudi Arabia",
     "location": "Jeddah Corniche Circuit, Jeddah",
@@ -36,6 +41,7 @@
   },
   {
     "id": "miami-grand-prix",
+    "circuit_id": "miami",
     "name": "Miami Grand Prix",
     "country": "United States",
     "location": "Miami International Autodrome, Miami Gardens, Florida",
@@ -43,6 +49,7 @@
   },
   {
     "id": "emilia-romagna-grand-prix",
+    "circuit_id": "imola",
     "name": "Emilia Romagna Grand Prix",
     "country": "Italy",
     "location": "Imola Circuit, Imola",
@@ -50,6 +57,7 @@
   },
   {
     "id": "monaco-grand-prix",
+    "circuit_id": "monaco",
     "name": "Monaco Grand Prix",
     "country": "Monaco",
     "location": "Circuit de Monaco, Monaco",
@@ -57,6 +65,7 @@
   },
   {
     "id": "spanish-grand-prix",
+    "circuit_id": "catalunya",
     "name": "Spanish Grand Prix",
     "country": "Spain",
     "location": "Circuit de Barcelona-Catalunya, Montmeló",
@@ -64,6 +73,7 @@
   },
   {
     "id": "canadian-grand-prix",
+    "circuit_id": "gilles_villeneuve",
     "name": "Canadian Grand Prix",
     "country": "Canada",
     "location": "Circuit Gilles Villeneuve, Montreal",
@@ -71,6 +81,7 @@
   },
   {
     "id": "austrian-grand-prix",
+    "circuit_id": "red_bull_ring",
     "name": "Austrian Grand Prix",
     "country": "Austria",
     "location": "Red Bull Ring, Spielberg",
@@ -78,6 +89,7 @@
   },
   {
     "id": "british-grand-prix",
+    "circuit_id": "silverstone",
     "name": "British Grand Prix",
     "country": "United Kingdom",
     "location": "Silverstone Circuit, Silverstone",
@@ -85,6 +97,7 @@
   },
   {
     "id": "belgian-grand-prix",
+    "circuit_id": "spa",
     "name": "Belgian Grand Prix",
     "country": "Belgium",
     "location": "Circuit de Spa-Francorchamps, Stavelot",
@@ -92,6 +105,7 @@
   },
   {
     "id": "hungarian-grand-prix",
+    "circuit_id": "hungaroring",
     "name": "Hungarian Grand Prix",
     "country": "Hungary",
     "location": "Hungaroring, Mogyoród",
@@ -99,6 +113,7 @@
   },
   {
     "id": "dutch-grand-prix",
+    "circuit_id": "zandvoort",
     "name": "Dutch Grand Prix",
     "country": "Netherlands",
     "location": "Circuit Zandvoort, Zandvoort",
@@ -106,6 +121,7 @@
   },
   {
     "id": "italian-grand-prix",
+    "circuit_id": "monza",
     "name": "Italian Grand Prix",
     "country": "Italy",
     "location": "Monza Circuit, Monza",
@@ -113,6 +129,7 @@
   },
   {
     "id": "azerbaijan-grand-prix",
+    "circuit_id": "baku",
     "name": "Azerbaijan Grand Prix",
     "country": "Azerbaijan",
     "location": "Baku City Circuit, Baku",
@@ -120,6 +137,7 @@
   },
   {
     "id": "singapore-grand-prix",
+    "circuit_id": "marina_bay",
     "name": "Singapore Grand Prix",
     "country": "Singapore",
     "location": "Marina Bay Street Circuit, Singapore",
@@ -127,6 +145,7 @@
   },
   {
     "id": "united-states-grand-prix",
+    "circuit_id": "americas",
     "name": "United States Grand Prix",
     "country": "United States",
     "location": "Circuit of the Americas, Austin, Texas",
@@ -134,6 +153,7 @@
   },
   {
     "id": "mexico-city-grand-prix",
+    "circuit_id": "rodriguez",
     "name": "Mexico City Grand Prix",
     "country": "Mexico",
     "location": "Autódromo Hermanos Rodríguez, Mexico City",
@@ -141,6 +161,7 @@
   },
   {
     "id": "sao-paulo-grand-prix",
+    "circuit_id": "interlagos",
     "name": "São Paulo Grand Prix",
     "country": "Brazil",
     "location": "Interlagos Circuit, São Paulo",
@@ -148,6 +169,7 @@
   },
   {
     "id": "las-vegas-grand-prix",
+    "circuit_id": "las_vegas",
     "name": "Las Vegas Grand Prix",
     "country": "United States",
     "location": "Las Vegas Strip Circuit, Paradise, Nevada",
@@ -155,6 +177,7 @@
   },
   {
     "id": "qatar-grand-prix",
+    "circuit_id": "losail",
     "name": "Qatar Grand Prix",
     "country": "Qatar",
     "location": "Lusail International Circuit, Lusail",
@@ -162,6 +185,7 @@
   },
   {
     "id": "abu-dhabi-grand-prix",
+    "circuit_id": "yas_marina",
     "name": "Abu Dhabi Grand Prix",
     "country": "United Arab Emirates",
     "location": "Yas Marina Circuit, Abu Dhabi",
