@@ -113,24 +113,14 @@ return [
         ],
 
         'openf1' => [
-            'driver' => 'mysql',
-            'url' => env('DB_OPENF1_URL'),
-            'host' => env('DB_OPENF1_HOST', '127.0.0.1'),
-            'port' => env('DB_OPENF1_PORT', '3306'),
-            'database' => env('DB_OPENF1_DATABASE', 'openf1'),
-            'username' => env('DB_OPENF1_USERNAME', 'root'),
-            'password' => env('DB_OPENF1_PASSWORD', ''),
-            'unix_socket' => env('DB_OPENF1_SOCKET', ''),
-            'charset' => env('DB_CHARSET', 'utf8mb4'),
-            'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'driver' => env('DB_OPENF1_CONNECTION', 'sqlite'),
+            'url' => env('DB_OPENF1_URL'), // opțional
+            'database' => env('DB_OPENF1_DATABASE', database_path('openf1.sqlite')),
             'prefix' => '',
-            'prefix_indexes' => true,
-            'strict' => true,
-            'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
+            'foreign_key_constraints' => true,
         ],
+
+
 
     ],
 
