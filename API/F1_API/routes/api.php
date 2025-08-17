@@ -21,5 +21,9 @@ Route::get('/drivers', [DriverController::class, 'index']);
 
 Route::get('/races', [RaceController::class, 'apiIndex'])->name('races.api');
 
+Route::get('/openf1/sessions/{session_key}/drivers', [OpenF1Controller::class, 'sessionDrivers']);
+Route::get('/openf1/sessions/{session_key}/laps', [OpenF1Controller::class, 'sessionLaps']);
+Route::get('/openf1/sessions/{session_key}/car_data', [OpenF1Controller::class, 'sessionCarData']);
+Route::get('/openf1/meetings/{meeting_key}/starting_grid', [OpenF1Controller::class, 'meetingGrid']);
 Route::get('/openf1/{table}', [OpenF1Controller::class, 'query']);
 
