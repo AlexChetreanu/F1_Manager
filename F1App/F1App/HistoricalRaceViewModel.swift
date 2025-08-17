@@ -43,9 +43,6 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var stepIndex: Int = 0
     @Published var playbackSpeed: Double = 1.0
     @Published var currentStepDuration: Double = 1.0
-    @Published var weather: SnapshotResponse.Weather?
-    @Published var raceControl: [SnapshotResponse.RaceControl] = []
-
     private var timer: Timer?
     private let speedOptions: [Double] = [1, 2, 5]
     private var speedIndex = 0
@@ -57,7 +54,7 @@ class HistoricalRaceViewModel: ObservableObject {
     }()
     private var trackBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
-    private var snapshotSince: String?
+    private var locationFetchCount = 0
 
     func load(for race: Race) {
         pause()
@@ -154,132 +151,86 @@ class HistoricalRaceViewModel: ObservableObject {
                 self.sessionStart = session.date_start
                 self.sessionEnd = session.date_end
                 self.errorMessage = nil
-                self.fetchSnapshot()
+                self.fetchDrivers(meetingKey: meetingKey, sessionKey: session.session_key)
             }
         }.resume()
     }
 
-    struct SnapshotResponse: Decodable {
-        struct Session: Decodable {
-            let session_key: Int
-            let meeting_key: Int
-            let status: String?
-            let server_time: String?
-        }
-        struct DriverEntry: Decodable {
-            struct Identity: Decodable {
-                let full_name: String
-                let team_name: String?
-                let team_colour: String?
-            }
-            struct Position: Decodable {
-                let position: Int?
-                let gap_to_leader: String?
-                let interval: String?
-                let date: String?
-            }
-            struct Lap: Decodable {
-                let lap_number: Int?
-                let lap_duration: String?
-                let date_start: String?
-            }
-            struct Car: Decodable {
-                let speed: Double?
-                let rpm: Double?
-                let throttle: Double?
-                let brake: Double?
-                let n_gear: Int?
-                let drs: Int?
-                let date: String?
-            }
-            struct Loc: Decodable {
-                let x: Double
-                let y: Double
-                let z: Double?
-                let date: String
-            }
-            let identity: Identity?
-            let position: Position?
-            let lap: Lap?
-            let car: Car?
-            let loc: Loc?
-        }
-        struct Weather: Decodable {
-            let air_temperature: Double?
-            let track_temperature: Double?
-            let humidity: Double?
-            let pressure: Double?
-            let wind_speed: Double?
-            let wind_direction: Double?
-            let rainfall: Double?
-            let date: String?
-        }
-        struct RaceControl: Decodable {
-            let flag: String?
-            let message: String?
-            let driver_number: Int?
-            let date: String?
-        }
-        let session: Session
-        let drivers: [String: DriverEntry]?
-        let weather: Weather?
-        let rc: [RaceControl]?
-        let since: String?
+    private struct DriversResponse: Decodable {
+        let data: [DriverInfo]
     }
 
-    private func fetchSnapshot() {
-        guard let sessionKey = sessionKey else { return }
-        var comps = URLComponents(string: "http://localhost:8000/api/live/snapshot")!
-        comps.queryItems = [
-            URLQueryItem(name: "session_key", value: String(sessionKey)),
-            URLQueryItem(name: "fields", value: "drivers,position,lap,car,loc,weather,rc"),
-            URLQueryItem(name: "window_ms", value: "2000")
-        ]
-        if let since = snapshotSince {
-            comps.queryItems?.append(URLQueryItem(name: "since", value: since))
-        }
+    private struct LocationsResponse: Decodable {
+        let data: [LocationPoint]
+    }
+
+    private func fetchDrivers(meetingKey: Int, sessionKey: Int) {
+        var comps = URLComponents(string: "http://127.0.0.1:8000/api/openf1/drivers")!
+        comps.queryItems = [URLQueryItem(name: "meeting_key", value: String(meetingKey))]
         guard let url = comps.url else { return }
         URLSession.shared.dataTask(with: url) { data, _, _ in
             guard let data = data,
-                  let snap = try? JSONDecoder().decode(SnapshotResponse.self, from: data) else { return }
+                  let response = try? JSONDecoder().decode(DriversResponse.self, from: data) else { return }
+            let uniqueDrivers = Array(Set(response.data))
             DispatchQueue.main.async {
-                self.snapshotSince = snap.since
-                if let map = snap.drivers {
-                    for (key, value) in map {
-                        let dn = Int(key) ?? 0
-                        if let identity = value.identity,
-                           !self.drivers.contains(where: { $0.driver_number == dn }) {
-                            let info = DriverInfo(driver_number: dn,
-                                                   full_name: identity.full_name,
-                                                   team_color: identity.team_colour,
-                                                   team_name: identity.team_name)
-                            self.drivers.append(info)
-                        }
-                        if let loc = value.loc {
-                            let point = LocationPoint(driver_number: dn, date: loc.date, x: loc.x, y: loc.y)
-                            var arr = self.positions[dn] ?? []
-                            arr.append(point)
-                            self.positions[dn] = arr
-                            self.currentPosition[dn] = point
-                        }
-                    }
-                    self.calculateLocationBounds()
-                    self.updatePositions()
-                }
-                if let weather = snap.weather {
-                    self.weather = weather
-                }
-                if let rc = snap.rc {
-                    self.raceControl.append(contentsOf: rc)
-                }
+                self.drivers = uniqueDrivers
+                self.fetchLocations(sessionKey: sessionKey)
             }
         }.resume()
     }
 
+    private func fetchLocations(sessionKey: Int) {
+        let formatter = ISO8601DateFormatter()
+        guard let startString = sessionStart,
+              let start = formatter.date(from: startString) else { return }
+        let end: Date
+        if let endString = sessionEnd, let endDate = formatter.date(from: endString) {
+            end = endDate
+        } else {
+            end = start.addingTimeInterval(3 * 60 * 60)
+        }
+        let startStr = formatter.string(from: start)
+        let endStr = formatter.string(from: end)
+        locationFetchCount = 0
+        for driver in drivers {
+            var comps = URLComponents(string: "http://127.0.0.1:8000/api/openf1/location")!
+            comps.queryItems = [
+                URLQueryItem(name: "session_key", value: String(sessionKey)),
+                URLQueryItem(name: "driver_number", value: String(driver.driver_number)),
+                URLQueryItem(name: "date__gte", value: startStr),
+                URLQueryItem(name: "date__lte", value: endStr),
+                URLQueryItem(name: "order_by", value: "date")
+            ]
+            guard let url = comps.url else { continue }
+            URLSession.shared.dataTask(with: url) { data, _, error in
+                defer {
+                    DispatchQueue.main.async {
+                        self.locationFetchCount += 1
+                        if self.locationFetchCount == self.drivers.count {
+                            self.errorMessage = self.positions.isEmpty ? "Date de locație indisponibile" : nil
+                            if !self.positions.isEmpty {
+                                self.calculateLocationBounds()
+                                self.updatePositions()
+                            }
+                        }
+                    }
+                }
+                guard error == nil, let data = data else { return }
+                guard let response = try? JSONDecoder().decode(LocationsResponse.self, from: data),
+                      !response.data.isEmpty else { return }
+                DispatchQueue.main.async {
+                    self.positions[driver.driver_number] = response.data
+                    self.currentPosition[driver.driver_number] = response.data.first
+                }
+            }.resume()
+        }
+    }
+
     private func calculateLocationBounds() {
-        guard let sample = positions.values.first, !sample.isEmpty else { return }
-        let xs = sample.map { $0.x }
-        let ys = sample.map { $0.y }
+        let allPoints = positions.values.flatMap { $0 }
+        guard !allPoints.isEmpty else { return }
+        let xs = allPoints.map { $0.x }
+        let ys = allPoints.map { $0.y }
         let minX = xs.min() ?? 0
         let maxX = xs.max() ?? 1
         let minY = ys.min() ?? 0
@@ -359,8 +310,5 @@ class HistoricalRaceViewModel: ObservableObject {
         return nil
     }
 
-    private func year(from iso: String) -> Int {
-        return Int(iso.prefix(4)) ?? 0
-    }
 }
 
