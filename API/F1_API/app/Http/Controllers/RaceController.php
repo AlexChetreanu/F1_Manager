@@ -12,7 +12,10 @@ class RaceController extends Controller
     // API endpoint JSON
     public function apiIndex()
     {
-        $races = DB::table('races')->get()->map(fn($race) => $this->applyDynamicStatus($race));
+        $races = DB::table('races')
+            ->select('id', 'name', 'circuit_id', 'location', 'date', 'status', 'coordinates', 'meeting_key')
+            ->get()
+            ->map(fn($race) => $this->applyDynamicStatus($race));
         return response()->json($races);
     }
 
