@@ -6,16 +6,6 @@ struct HistoricalRaceView: View {
 
     var body: some View {
         VStack {
-            HStack {
-                TextField("Anul", text: $viewModel.year)
-                    .keyboardType(.numberPad)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                Button("Caută") {
-                    viewModel.load(for: race)
-                }
-            }
-            .padding()
-
             if let error = viewModel.errorMessage {
                 Text(error)
                     .foregroundColor(.red)
@@ -123,6 +113,9 @@ struct HistoricalRaceView: View {
                 .frame(maxHeight: 200)
             }
             Spacer()
+        }
+        .onAppear {
+            viewModel.load(for: race)
         }
     }
 }
