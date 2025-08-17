@@ -50,85 +50,64 @@ class DriverDetailViewModel: ObservableObject {
     init(driver: DriverInfo, sessionKey: Int?) {
         self.driverNumber = driver.driver_number
         self.sessionKey = sessionKey
-        fetchData()
+        fetchSnapshot()
     }
 
-    func fetchData() {
+    private struct SnapshotResponse: Decodable {
+        struct DriverEntry: Decodable {
+            struct Position: Decodable {
+                let gap_to_leader: String?
+                let position: Int?
+            }
+            struct Lap: Decodable {
+                let lap_number: Int?
+            }
+            struct Car: Decodable {
+                let rpm: Double?
+                let speed: Double?
+                let brake: Double?
+            }
+            let position: Position?
+            let lap: Lap?
+            let car: Car?
+        }
+        struct RaceControl: Decodable {
+            let flag: String?
+            let driver_number: Int?
+        }
+        let drivers: [String: DriverEntry]?
+        let rc: [RaceControl]?
+    }
+
+    private func fetchSnapshot() {
         guard let sessionKey = sessionKey else { return }
-        fetchPosition(sessionKey: sessionKey)
-        fetchCarData(sessionKey: sessionKey)
-        fetchLaps(sessionKey: sessionKey)
-        fetchDSQ(sessionKey: sessionKey)
-    }
-
-    private struct PositionResponse: Decodable {
-        let gap_to_leader: String?
-        let position: Int?
-    }
-
-    private func fetchPosition(sessionKey: Int) {
-        guard let url = URL(string: "https://api.openf1.org/v1/position?session_key=\(sessionKey)&driver_number=\(driverNumber)") else { return }
+        var components = URLComponents(string: "http://localhost:8000/api/live/snapshot")!
+        components.queryItems = [
+            URLQueryItem(name: "session_key", value: String(sessionKey)),
+            URLQueryItem(name: "fields", value: "position,lap,car,rc"),
+            URLQueryItem(name: "window_ms", value: "2000")
+        ]
+        guard let url = components.url else { return }
         URLSession.shared.dataTask(with: url) { data, _, _ in
             guard let data = data,
-                  let result = try? JSONDecoder().decode([PositionResponse].self, from: data),
-                  let last = result.last else { return }
+                  let snap = try? JSONDecoder().decode(SnapshotResponse.self, from: data),
+                  let driverEntry = snap.drivers?[String(self.driverNumber)] else { return }
             DispatchQueue.main.async {
-                self.gapToLeader = last.gap_to_leader ?? "-"
-                if let pos = last.position {
-                    self.position = String(pos)
+                if let pos = driverEntry.position {
+                    self.gapToLeader = pos.gap_to_leader ?? "-"
+                    if let p = pos.position { self.position = String(p) }
                 }
-            }
-        }.resume()
-    }
-
-    private struct CarDataResponse: Decodable {
-        let rpm: Double?
-        let speed: Double?
-        let brake: Double?
-    }
-
-    private func fetchCarData(sessionKey: Int) {
-        guard let url = URL(string: "https://api.openf1.org/v1/car_data?session_key=\(sessionKey)&driver_number=\(driverNumber)") else { return }
-        URLSession.shared.dataTask(with: url) { data, _, _ in
-            guard let data = data,
-                  let result = try? JSONDecoder().decode([CarDataResponse].self, from: data),
-                  let last = result.last else { return }
-            DispatchQueue.main.async {
-                if let rpm = last.rpm { self.rpm = String(Int(rpm)) }
-                if let speed = last.speed { self.speed = String(format: "%.1f", speed) }
-                if let brake = last.brake { self.brake = String(format: "%.1f", brake) }
-            }
-        }.resume()
-    }
-
-    private struct LapResponse: Decodable {
-        let lap_number: Int?
-        let compound: String?
-    }
-
-    private func fetchLaps(sessionKey: Int) {
-        guard let url = URL(string: "https://api.openf1.org/v1/laps?session_key=\(sessionKey)&driver_number=\(driverNumber)") else { return }
-        URLSession.shared.dataTask(with: url) { data, _, _ in
-            guard let data = data,
-                  let result = try? JSONDecoder().decode([LapResponse].self, from: data) else { return }
-            DispatchQueue.main.async {
-                self.numberOfLaps = result.count
-                self.compound = result.last?.compound ?? "-"
-            }
-        }.resume()
-    }
-
-    private struct RaceControlResponse: Decodable {
-        let flag: String?
-    }
-
-    private func fetchDSQ(sessionKey: Int) {
-        guard let url = URL(string: "https://api.openf1.org/v1/race_control?session_key=\(sessionKey)&driver_number=\(driverNumber)") else { return }
-        URLSession.shared.dataTask(with: url) { data, _, _ in
-            guard let data = data,
-                  let result = try? JSONDecoder().decode([RaceControlResponse].self, from: data) else { return }
-            DispatchQueue.main.async {
-                self.dsq = result.contains { ($0.flag ?? "").uppercased() == "DSQ" }
+                if let car = driverEntry.car {
+                    if let rpm = car.rpm { self.rpm = String(Int(rpm)) }
+                    if let speed = car.speed { self.speed = String(format: "%.1f", speed) }
+                    if let brake = car.brake { self.brake = String(format: "%.1f", brake) }
+                }
+                if let lap = driverEntry.lap {
+                    self.numberOfLaps = lap.lap_number ?? 0
+                }
+                if let rc = snap.rc {
+                    self.dsq = rc.contains { ($0.flag ?? "").uppercased() == "DSQ" && $0.driver_number == self.driverNumber }
+                }
             }
         }.resume()
     }
