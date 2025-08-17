@@ -29,7 +29,7 @@ class OpenF1Controller extends Controller
             return response()->json(['error' => 'Table not found'], 404);
         }
 
-        $schema = Schema::connection('openf1.db');
+        $schema = Schema::connection('openf1');
         $columnsListing = $schema->getColumnListing($table);
 
         // Columns selection
