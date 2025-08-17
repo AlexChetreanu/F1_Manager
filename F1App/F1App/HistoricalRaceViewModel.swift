@@ -38,6 +38,7 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var isRunning = false
     @Published var trackPoints: [CGPoint] = []
     @Published var sessionKey: Int?
+    @Published var meetingKey: Int?
     @Published var sessionStart: String?
     @Published var sessionEnd: String?
     @Published var stepIndex: Int = 0
@@ -69,7 +70,12 @@ class HistoricalRaceViewModel: ObservableObject {
             errorMessage = "Selectează un an valid"
             return
         }
-        resolveSession(meetingName: race.name, year: yearInt)
+        guard let mKey = race.meeting_key else {
+            errorMessage = "Lipsește meeting_key pentru cursă"
+            return
+        }
+        meetingKey = mKey
+        resolveSession(meetingKey: mKey, year: yearInt)
     }
 
     private func parseTrack(_ json: String?) {
@@ -99,11 +105,11 @@ class HistoricalRaceViewModel: ObservableObject {
         let date_end: String?
     }
 
-    private func resolveSession(meetingName: String, year: Int) {
+    private func resolveSession(meetingKey: Int, year: Int) {
         var comps = URLComponents(string: "http://localhost:8000/api/live/resolve")!
         comps.queryItems = [
             URLQueryItem(name: "year", value: String(year)),
-            URLQueryItem(name: "meeting_name", value: meetingName),
+            URLQueryItem(name: "meeting_key", value: String(meetingKey)),
             URLQueryItem(name: "session_type", value: "Race")
         ]
         guard let url = comps.url else { return }
