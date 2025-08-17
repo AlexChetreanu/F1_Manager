@@ -8,7 +8,6 @@
 struct Race: Identifiable, Decodable {
     let id: Int
     let name: String
-    let meeting_key: Int?
     let circuit_id: String?
     let location: String
     let date: String
