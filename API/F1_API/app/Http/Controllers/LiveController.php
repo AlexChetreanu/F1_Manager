@@ -11,21 +11,28 @@ class LiveController extends Controller
 {
     public function resolveSession(Request $request)
     {
-        $circuitId = $request->query('circuit_id');
-        $date = $request->query('date');
+        $year = (int) $request->query('year');
+        $meetingKey = $request->query('meeting_key');
+        $meetingName = $request->query('meeting_name');
         $sessionType = $request->query('session_type', 'Race');
 
-        if (! $circuitId || ! $date) {
+        if (! $year || (! $meetingKey && ! $meetingName)) {
             return response()->json(['error' => 'Missing parameters'], 400);
         }
 
-        $session = DB::connection('openf1')->table('sessions')
+        $query = DB::connection('openf1')->table('sessions')
             ->select('sessions.session_key', 'sessions.meeting_key', 'sessions.session_type', 'sessions.date_start', 'sessions.date_end')
             ->join('meetings', 'sessions.meeting_key', '=', 'meetings.meeting_key')
-            ->where('meetings.circuit_key', $circuitId)
-            ->whereDate('sessions.date_start', $date)
-            ->where('sessions.session_type', $sessionType)
-            ->first();
+            ->where('meetings.year', $year)
+            ->where('sessions.session_type', $sessionType);
+
+        if ($meetingKey) {
+            $query->where('sessions.meeting_key', (int) $meetingKey);
+        } else {
+            $query->whereRaw('LOWER(meetings.meeting_name) LIKE ?', ['%' . strtolower($meetingName) . '%']);
+        }
+
+        $session = $query->first();
 
         if (! $session) {
             return response()->json(['error' => 'Session not found'], 404);
@@ -76,7 +83,7 @@ class LiveController extends Controller
         $response = new StreamedResponse(function () use ($sessionKey, $windowMs, $fields) {
             while (connection_aborted() === 0) {
                 $payload = $this->snapshotInternal($sessionKey, $windowMs, $fields, null);
-                echo 'data: '.json_encode($payload)."\n\n";
+                echo 'data: ' . json_encode($payload) . "\n\n";
                 ob_flush();
                 flush();
                 sleep(1);
@@ -267,3 +274,4 @@ class LiveController extends Controller
         return $out;
     }
 }
+
