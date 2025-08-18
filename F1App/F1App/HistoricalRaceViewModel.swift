@@ -349,8 +349,14 @@ class HistoricalRaceViewModel: ObservableObject {
         URLSession.shared.dataTask(with: healthURL) { data, resp, err in
             self.log("GET /api/health", "err=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
 
-            guard let yearInt = Int(self.year) else { self.diagnosisSummary = "An invalid."; return }
-            guard let circuitId = race.circuit_id, let circuitKey = Int(circuitId) else { self.diagnosisSummary = "Lipsește circuit_id."; return }
+            guard let yearInt = Int(self.year) else {
+                DispatchQueue.main.async { self.diagnosisSummary = "An invalid." }
+                return
+            }
+            guard let circuitId = race.circuit_id, let circuitKey = Int(circuitId) else {
+                DispatchQueue.main.async { self.diagnosisSummary = "Lipsește circuit_id." }
+                return
+            }
 
             var comps = URLComponents(string: "\(APIConfig.baseURL)/api/live/resolve")!
             comps.queryItems = [
@@ -363,7 +369,7 @@ class HistoricalRaceViewModel: ObservableObject {
             URLSession.shared.dataTask(with: resolveURL) { data, resp, err in
                 self.log("GET /live/resolve", "url=\(resolveURL)\nerr=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
                 guard err == nil, let data = data, let session = try? JSONDecoder().decode(ResolveResponse.self, from: data) else {
-                    self.diagnosisSummary = "resolve a eșuat. Vezi log."
+                    DispatchQueue.main.async { self.diagnosisSummary = "resolve a eșuat. Vezi log." }
                     return
                 }
                 let sk = session.session_key
@@ -373,7 +379,7 @@ class HistoricalRaceViewModel: ObservableObject {
                 URLSession.shared.dataTask(with: driversURL) { data, resp, err in
                     self.log("GET /openf1/drivers", "url=\(driversURL)\nerr=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
                     guard err == nil, let data = data, let dr = try? JSONDecoder().decode(DriversResponse.self, from: data) else {
-                        self.diagnosisSummary = "drivers a eșuat. Vezi log."
+                        DispatchQueue.main.async { self.diagnosisSummary = "drivers a eșuat. Vezi log." }
                         return
                     }
                     let countDrivers = dr.data.count
@@ -390,7 +396,9 @@ class HistoricalRaceViewModel: ObservableObject {
                         if let data = data, let lr = try? JSONDecoder().decode(LocationsResponse.self, from: data) {
                             locCount = lr.data.count
                         }
-                        self.diagnosisSummary = "OK resolve (sk=\(sk)), drivers=\(countDrivers), location_first=\(locCount). Vezi log pentru detalii."
+                        DispatchQueue.main.async {
+                            self.diagnosisSummary = "OK resolve (sk=\(sk)), drivers=\(countDrivers), location_first=\(locCount). Vezi log pentru detalii."
+                        }
                     }.resume()
                 }.resume()
             }.resume()
