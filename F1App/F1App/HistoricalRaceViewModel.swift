@@ -207,7 +207,22 @@ class HistoricalRaceViewModel: ObservableObject {
         let startStr = dateFormatter.string(from: start)
         let endStr = dateFormatter.string(from: end)
         locationFetchCount = 0
+
         for driver in drivers {
+            fetchDriverLocations(driver: driver,
+                                 sessionKey: sessionKey,
+                                 startStr: startStr,
+                                 endStr: endStr,
+                                 offset: 0,
+                                 accumulated: [])
+        }
+
+        func fetchDriverLocations(driver: DriverInfo,
+                                  sessionKey: Int,
+                                  startStr: String,
+                                  endStr: String,
+                                  offset: Int,
+                                  accumulated: [LocationPoint]) {
             var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/location")!
             comps.queryItems = [
                 URLQueryItem(name: "session_key", value: String(sessionKey)),
@@ -215,42 +230,66 @@ class HistoricalRaceViewModel: ObservableObject {
                 URLQueryItem(name: "date__gt", value: startStr),
                 URLQueryItem(name: "date__lt", value: endStr),
                 URLQueryItem(name: "order_by", value: "date"),
-                URLQueryItem(name: "limit", value: "1000")
+                URLQueryItem(name: "limit", value: "1000"),
+                URLQueryItem(name: "offset", value: String(offset))
             ]
-            guard let url = comps.url else { continue }
+            guard let url = comps.url else { return }
             URLSession.shared.dataTask(with: url) { data, resp, error in
-                defer {
-                    DispatchQueue.main.async {
-                        self.locationFetchCount += 1
-                        if self.locationFetchCount == self.drivers.count {
-                            if self.errorMessage != nil {
-                                return
-                            } else if self.positions.isEmpty {
-                                self.errorMessage = "Date indisponibile"
-                            } else {
-                                self.calculateLocationBounds()
-                                self.updatePositions()
-                            }
-                        }
-                    }
-                }
                 self.log("GET /openf1/location", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
                 if let error = error {
-                    DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /location: \(error.localizedDescription)" }
+                    DispatchQueue.main.async {
+                        self.errorMessage = "Eroare rețea la /location: \(error.localizedDescription)"
+                        self.driverFetchCompleted()
+                    }
                     return
                 }
-                guard let data = data else { return }
+                guard let data = data else {
+                    DispatchQueue.main.async { self.driverFetchCompleted() }
+                    return
+                }
                 do {
                     let response = try JSONDecoder().decode(LocationsResponse.self, from: data)
-                    guard !response.data.isEmpty else { return }
-                    DispatchQueue.main.async {
-                        self.positions[driver.driver_number] = response.data
-                        self.currentPosition[driver.driver_number] = response.data.first
+                    let converted = response.data.map { lp -> LocationPoint in
+                        var isoDate = lp.date
+                        if let d = backendFormatter.date(from: lp.date) {
+                            isoDate = self.dateFormatter.string(from: d)
+                        }
+                        return LocationPoint(driver_number: lp.driver_number, date: isoDate, x: lp.x, y: lp.y)
+                    }
+                    let newAccum = accumulated + converted
+                    if response.data.count == 1000 {
+                        fetchDriverLocations(driver: driver,
+                                             sessionKey: sessionKey,
+                                             startStr: startStr,
+                                             endStr: endStr,
+                                             offset: offset + 1000,
+                                             accumulated: newAccum)
+                    } else {
+                        DispatchQueue.main.async {
+                            self.positions[driver.driver_number] = newAccum
+                            self.currentPosition[driver.driver_number] = newAccum.first
+                            self.driverFetchCompleted()
+                        }
                     }
                 } catch {
                     self.log("decode /location", error.localizedDescription)
+                    DispatchQueue.main.async { self.driverFetchCompleted() }
                 }
             }.resume()
+        }
+    }
+
+    private func driverFetchCompleted() {
+        locationFetchCount += 1
+        if locationFetchCount == drivers.count {
+            if errorMessage != nil {
+                return
+            } else if positions.isEmpty {
+                errorMessage = "Date indisponibile"
+            } else {
+                calculateLocationBounds()
+                updatePositions()
+            }
         }
     }
 
