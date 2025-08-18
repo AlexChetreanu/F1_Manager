@@ -43,6 +43,9 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var stepIndex: Int = 0
     @Published var playbackSpeed: Double = 1.0
     @Published var currentStepDuration: Double = 1.0
+    @Published var debugEnabled = true
+    @Published var diagnosisSummary: String?
+    let logger = DebugLogger()
     private var timer: Timer?
     private let speedOptions: [Double] = [1, 2, 5]
     private var speedIndex = 0
@@ -55,6 +58,17 @@ class HistoricalRaceViewModel: ObservableObject {
     private var trackBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationFetchCount = 0
+
+    private func log(_ title: String, _ detail: String = "") {
+        guard debugEnabled else { return }
+        logger.log(title, detail)
+    }
+
+    private func previewBody(_ data: Data?, max: Int = 500) -> String {
+        guard let d = data else { return "<no body>" }
+        let s = String(data: d, encoding: .utf8) ?? "<non-utf8 \(d.count) bytes>"
+        return s.count > max ? String(s.prefix(max)) + " …" : s
+    }
 
     func load(for race: Race) {
         pause()
@@ -114,22 +128,28 @@ class HistoricalRaceViewModel: ObservableObject {
         }
         comps.queryItems = items
         guard let url = comps.url else { return }
-        URLSession.shared.dataTask(with: url) { data, _, error in
+        URLSession.shared.dataTask(with: url) { data, resp, error in
+            self.log("GET /live/resolve", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
             if let error = error {
                 DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /resolve: \(error.localizedDescription)" }
                 return
             }
-            guard let data = data,
-                  let session = try? JSONDecoder().decode(ResolveResponse.self, from: data) else {
+            guard let data = data else {
                 DispatchQueue.main.async { self.errorMessage = "Nu am găsit sesiunea" }
                 return
             }
-            DispatchQueue.main.async {
-                self.sessionKey = session.session_key
-                self.sessionStart = session.date_start
-                self.sessionEnd = session.date_end
-                self.errorMessage = nil
-                self.fetchDrivers(sessionKey: session.session_key)
+            do {
+                let session = try JSONDecoder().decode(ResolveResponse.self, from: data)
+                DispatchQueue.main.async {
+                    self.sessionKey = session.session_key
+                    self.sessionStart = session.date_start
+                    self.sessionEnd = session.date_end
+                    self.errorMessage = nil
+                    self.fetchDrivers(sessionKey: session.session_key)
+                }
+            } catch {
+                self.log("decode /resolve", error.localizedDescription)
+                DispatchQueue.main.async { self.errorMessage = "Nu am găsit sesiunea" }
             }
         }.resume()
     }
@@ -146,17 +166,22 @@ class HistoricalRaceViewModel: ObservableObject {
         var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/drivers")!
         comps.queryItems = [URLQueryItem(name: "session_key", value: String(sessionKey))]
         guard let url = comps.url else { return }
-        URLSession.shared.dataTask(with: url) { data, _, error in
+        URLSession.shared.dataTask(with: url) { data, resp, error in
+            self.log("GET /openf1/drivers", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
             if let error = error {
                 DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /drivers: \(error.localizedDescription)" }
                 return
             }
-            guard let data = data,
-                  let response = try? JSONDecoder().decode(DriversResponse.self, from: data) else { return }
-            let uniqueDrivers = Array(Set(response.data))
-            DispatchQueue.main.async {
-                self.drivers = uniqueDrivers
-                self.fetchLocations(sessionKey: sessionKey)
+            guard let data = data else { return }
+            do {
+                let response = try JSONDecoder().decode(DriversResponse.self, from: data)
+                let uniqueDrivers = Array(Set(response.data))
+                DispatchQueue.main.async {
+                    self.drivers = uniqueDrivers
+                    self.fetchLocations(sessionKey: sessionKey)
+                }
+            } catch {
+                self.log("decode /drivers", error.localizedDescription)
             }
         }.resume()
     }
@@ -185,7 +210,7 @@ class HistoricalRaceViewModel: ObservableObject {
                 URLQueryItem(name: "limit", value: "1000")
             ]
             guard let url = comps.url else { continue }
-            URLSession.shared.dataTask(with: url) { data, _, error in
+            URLSession.shared.dataTask(with: url) { data, resp, error in
                 defer {
                     DispatchQueue.main.async {
                         self.locationFetchCount += 1
@@ -201,16 +226,21 @@ class HistoricalRaceViewModel: ObservableObject {
                         }
                     }
                 }
+                self.log("GET /openf1/location", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
                 if let error = error {
                     DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /location: \(error.localizedDescription)" }
                     return
                 }
-                guard let data = data,
-                      let response = try? JSONDecoder().decode(LocationsResponse.self, from: data),
-                      !response.data.isEmpty else { return }
-                DispatchQueue.main.async {
-                    self.positions[driver.driver_number] = response.data
-                    self.currentPosition[driver.driver_number] = response.data.first
+                guard let data = data else { return }
+                do {
+                    let response = try JSONDecoder().decode(LocationsResponse.self, from: data)
+                    guard !response.data.isEmpty else { return }
+                    DispatchQueue.main.async {
+                        self.positions[driver.driver_number] = response.data
+                        self.currentPosition[driver.driver_number] = response.data.first
+                    }
+                } catch {
+                    self.log("decode /location", error.localizedDescription)
                 }
             }.resume()
         }
@@ -298,6 +328,65 @@ class HistoricalRaceViewModel: ObservableObject {
             }
         }
         return nil
+    }
+
+    // MARK: - Debug diagnosis
+
+    func runDiagnosis(for race: Race) {
+        diagnosisSummary = nil
+        logger.clear()
+        log("Starting diagnosis", "year=\(year), circuit_id=\(race.circuit_id ?? \"nil\"), date=\(race.date) baseURL=\(APIConfig.baseURL)")
+
+        let healthURL = URL(string: "\(APIConfig.baseURL)/api/health")!
+        URLSession.shared.dataTask(with: healthURL) { data, resp, err in
+            self.log("GET /api/health", "err=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+
+            guard let yearInt = Int(self.year) else { self.diagnosisSummary = "An invalid."; return }
+            guard let circuitId = race.circuit_id, let circuitKey = Int(circuitId) else { self.diagnosisSummary = "Lipsește circuit_id."; return }
+
+            var comps = URLComponents(string: "\(APIConfig.baseURL)/api/live/resolve")!
+            comps.queryItems = [
+                URLQueryItem(name: "year", value: String(yearInt)),
+                URLQueryItem(name: "circuit_key", value: String(circuitKey)),
+                URLQueryItem(name: "date", value: String(race.date.prefix(10))),
+                URLQueryItem(name: "session_type", value: "Race")
+            ]
+            let resolveURL = comps.url!
+            URLSession.shared.dataTask(with: resolveURL) { data, resp, err in
+                self.log("GET /live/resolve", "url=\(resolveURL)\nerr=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+                guard err == nil, let data = data, let session = try? JSONDecoder().decode(ResolveResponse.self, from: data) else {
+                    self.diagnosisSummary = "resolve a eșuat. Vezi log."
+                    return
+                }
+                let sk = session.session_key
+                var driversComps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/drivers")!
+                driversComps.queryItems = [URLQueryItem(name: "session_key", value: String(sk)), URLQueryItem(name: "limit", value: "5")]
+                let driversURL = driversComps.url!
+                URLSession.shared.dataTask(with: driversURL) { data, resp, err in
+                    self.log("GET /openf1/drivers", "url=\(driversURL)\nerr=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+                    guard err == nil, let data = data, let dr = try? JSONDecoder().decode(DriversResponse.self, from: data) else {
+                        self.diagnosisSummary = "drivers a eșuat. Vezi log."
+                        return
+                    }
+                    let countDrivers = dr.data.count
+                    var locURLC = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/location")!
+                    locURLC.queryItems = [
+                        URLQueryItem(name: "session_key", value: String(sk)),
+                        URLQueryItem(name: "order_by", value: "date"),
+                        URLQueryItem(name: "limit", value: "1")
+                    ]
+                    let locURL = locURLC.url!
+                    URLSession.shared.dataTask(with: locURL) { data, resp, err in
+                        self.log("GET /openf1/location", "url=\(locURL)\nerr=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+                        var locCount = 0
+                        if let data = data, let lr = try? JSONDecoder().decode(LocationsResponse.self, from: data) {
+                            locCount = lr.data.count
+                        }
+                        self.diagnosisSummary = "OK resolve (sk=\(sk)), drivers=\(countDrivers), location_first=\(locCount). Vezi log pentru detalii."
+                    }.resume()
+                }.resume()
+            }.resume()
+        }.resume()
     }
 
 }
