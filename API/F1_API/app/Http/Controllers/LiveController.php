@@ -450,12 +450,31 @@ class LiveController extends Controller
 
         $sessionKey = (int) $request->query('session_key');
         if (! $sessionKey) {
-            return response('Missing session_key', 400);
+            $year = (int) $request->query('year');
+            $circuitKey = (int) $request->query('circuit_key');
+            if ($year && $circuitKey) {
+                $meeting = DB::connection('openf1')->table('meetings')
+                    ->where('year', $year)
+                    ->where('circuit_key', $circuitKey)
+                    ->orderBy('date_start')
+                    ->first();
+                if ($meeting) {
+                    $session = DB::connection('openf1')->table('sessions')
+                        ->where('meeting_key', $meeting->meeting_key)
+                        ->where('session_type', 'Race')
+                        ->orderBy('date_start')
+                        ->first();
+                    $sessionKey = $session->session_key ?? 0;
+                }
+            }
+            if (! $sessionKey) {
+                return response('Missing session_key', 400);
+            }
         }
 
-        $tickMs = max(250, (int) $request->query('tick_ms', 1000));
+        $tickMs = max(200, (int) $request->query('tick_ms', 200));
         $durationSec = min(300, max(5, (int) $request->query('duration_sec', 30)));
-        $mode = strtolower($request->query('mode', 'delta'));
+        $mode = strtolower($request->query('mode', 'full'));
         $onlyChanged = $mode !== 'full';
         $fieldsCsv = $request->query('fields', 'loc,pos,speed');
         $fields = array_filter(array_map('trim', explode(',', $fieldsCsv)));
