@@ -81,7 +81,7 @@ class DriverDetailViewModel: ObservableObject {
 
     private func fetchSnapshot() {
         guard let sessionKey = sessionKey else { return }
-        var components = URLComponents(string: "http://localhost:8000/api/live/snapshot")!
+        var components = URLComponents(string: "\(APIConfig.baseURL)/api/live/snapshot")!
         components.queryItems = [
             URLQueryItem(name: "session_key", value: String(sessionKey)),
             URLQueryItem(name: "fields", value: "position,lap,car,rc"),

@@ -10,10 +10,10 @@ import Combine
 
 class RacesViewModel: ObservableObject {
     @Published var races = [Race]()
-    
+
     func fetchRaces() {
-        guard let url = URL(string: "http://localhost:8000/api/races") else { return }
-        
+        guard let url = URL(string: "\(APIConfig.baseURL)/api/races") else { return }
+
         URLSession.shared.dataTask(with: url) { data, response, error in
             if let data = data {
                 if let decoded = try? JSONDecoder().decode([Race].self, from: data) {
