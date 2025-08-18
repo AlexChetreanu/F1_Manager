@@ -75,8 +75,8 @@ struct HistoricalRaceView: View {
                 .cornerRadius(8)
                 .padding()
 
-                if viewModel.currentPosition.isEmpty {
-                    Text("Date de locație indisponibile")
+                if viewModel.currentPosition.isEmpty && viewModel.errorMessage == nil {
+                    Text("Date indisponibile")
                         .foregroundColor(.red)
                         .padding(.bottom)
                 }
