@@ -30,7 +30,7 @@ Route::get('/openf1/meetings/{meeting_key}/starting_grid', [OpenF1Controller::cl
 Route::get('/openf1/{table}', [OpenF1Controller::class, 'query']);
 
 Route::get('/live/resolve', [LiveController::class, 'resolveSession']);
-Route::get('/live/snapshot', [LiveController::class, 'snapshot']);
-Route::get('/live/stream', [LiveController::class, 'stream']);
+Route::get('/live/snapshot', [LiveController::class, 'snapshotAll']);
+Route::get('/live/stream',   [LiveController::class, 'stream']);
 Route::get('/health', [HealthController::class, 'index']);
 
