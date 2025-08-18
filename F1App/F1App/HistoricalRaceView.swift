@@ -4,6 +4,7 @@ struct HistoricalRaceView: View {
     let race: Race
     @ObservedObject var viewModel: HistoricalRaceViewModel
     @State private var showDebug = false
+    @State private var selectedDriver: DriverInfo?
 
     var body: some View {
         VStack {
@@ -56,6 +57,9 @@ struct HistoricalRaceView: View {
                                             .fill(Color(hex: driver.team_color ?? "FF0000"))
                                             .frame(width: 8, height: 8)
                                             .position(point)
+                                            .onTapGesture {
+                                                selectedDriver = driver
+                                            }
                                         Text(driver.initials)
                                             .font(.caption2)
                                             .position(x: point.x, y: point.y - 10)
@@ -138,6 +142,9 @@ struct HistoricalRaceView: View {
                 }
                 DebugLogView(logger: viewModel.logger)
             }
+        }
+        .sheet(item: $selectedDriver) { driver in
+            DriverDetailView(driver: driver, sessionKey: viewModel.sessionKey)
         }
     }
 }
