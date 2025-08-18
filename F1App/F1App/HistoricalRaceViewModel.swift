@@ -77,30 +77,17 @@ class HistoricalRaceViewModel: ObservableObject {
         currentPosition.removeAll()
         parseTrack(race.coordinates)
 
+        guard let yearInt = Int(year) else {
+            errorMessage = "Selectează un an valid"
+            return
+        }
         guard let circuitId = race.circuit_id, let circuitKey = Int(circuitId) else {
             errorMessage = "Lipsește circuit_id"
             return
         }
 
-        // Folosește anul introdus de utilizator dacă este valid, altfel extrage din data cursei
-        let selectedYear: Int
-        if !year.isEmpty, let userYear = Int(year) {
-            selectedYear = userYear
-        } else if let raceYear = Int(race.date.prefix(4)) {
-            selectedYear = raceYear
-        } else {
-            errorMessage = "Data cursei invalidă"
-            return
-        }
-
-        let selectedDate = "\(selectedYear)\(race.date.dropFirst(4))"
-
-        resolveSession(
-            year: selectedYear,
-            meetingKey: nil,
-            circuitKey: circuitKey,
-            date: selectedDate
-        )
+        // Rezolvă sesiunea DOAR cu year + circuit_key
+        resolveSession(year: yearInt, meetingKey: nil, circuitKey: circuitKey)
     }
 
     private func parseTrack(_ json: String?) {
@@ -130,7 +117,7 @@ class HistoricalRaceViewModel: ObservableObject {
         let date_end: String?
     }
 
-    private func resolveSession(year: Int, meetingKey: Int?, circuitKey: Int?, date: String?) {
+    private func resolveSession(year: Int, meetingKey: Int?, circuitKey: Int?) {
         var comps = URLComponents(string: "\(APIConfig.baseURL)/api/live/resolve")!
         var items = [
             URLQueryItem(name: "year", value: String(year)),
@@ -138,12 +125,12 @@ class HistoricalRaceViewModel: ObservableObject {
         ]
         if let mk = meetingKey {
             items.append(URLQueryItem(name: "meeting_key", value: String(mk)))
-        } else if let ck = circuitKey, let d = date {
+        } else if let ck = circuitKey {
             items.append(URLQueryItem(name: "circuit_key", value: String(ck)))
-            items.append(URLQueryItem(name: "date", value: d))
         }
         comps.queryItems = items
-        guard let url = comps.url else { return }
+
+        let url = comps.url!
         URLSession.shared.dataTask(with: url) { data, resp, error in
             self.log("GET /live/resolve", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
             if let http = resp as? HTTPURLResponse, http.statusCode != 200 {
