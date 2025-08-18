@@ -345,7 +345,12 @@ class HistoricalRaceViewModel: ObservableObject {
     func runDiagnosis(for race: Race) {
         diagnosisSummary = nil
         logger.clear()
-        log("Starting diagnosis", "year=\(year), circuit_id=\(race.circuit_id ?? \"nil\"), date=\(race.date) baseURL=\(APIConfig.baseURL)")
+        log(
+          "Starting diagnosis",
+          """
+          year=\(year), circuit_id=\(race.circuit_id ?? "nil"), date=\(race.date) baseURL=\(APIConfig.baseURL)
+          """
+        )
 
         let healthURL = URL(string: "\(APIConfig.baseURL)/api/health")!
         URLSession.shared.dataTask(with: healthURL) { data, resp, err in
