@@ -76,15 +76,25 @@ class HistoricalRaceViewModel: ObservableObject {
         positions.removeAll()
         currentPosition.removeAll()
         parseTrack(race.coordinates)
-        guard let yearInt = Int(year) else {
-            errorMessage = "Selectează un an valid"
-            return
-        }
+
         guard let circuitId = race.circuit_id, let circuitKey = Int(circuitId) else {
             errorMessage = "Lipsește circuit_id"
             return
         }
-        resolveSession(year: yearInt, meetingKey: nil, circuitKey: circuitKey, date: String(race.date.prefix(10)))
+
+        // Derivează anul din data cursei (YYYY-MM-DD...)
+        let raceYear = Int(race.date.prefix(4)) ?? (Int(year) ?? 0)
+        if raceYear == 0 {
+            errorMessage = "Data cursei invalidă"
+            return
+        }
+
+        resolveSession(
+            year: raceYear,
+            meetingKey: nil,
+            circuitKey: circuitKey,
+            date: String(race.date.prefix(10))
+        )
     }
 
     private func parseTrack(_ json: String?) {
@@ -130,26 +140,26 @@ class HistoricalRaceViewModel: ObservableObject {
         guard let url = comps.url else { return }
         URLSession.shared.dataTask(with: url) { data, resp, error in
             self.log("GET /live/resolve", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+            if let http = resp as? HTTPURLResponse, http.statusCode != 200 {
+                let body = String(data: data ?? Data(), encoding: .utf8) ?? ""
+                DispatchQueue.main.async { self.errorMessage = "Resolve \(http.statusCode): \(body)" }
+                return
+            }
             if let error = error {
                 DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /resolve: \(error.localizedDescription)" }
                 return
             }
-            guard let data = data else {
-                DispatchQueue.main.async { self.errorMessage = "Nu am găsit sesiunea" }
+            guard let data = data,
+                  let session = try? JSONDecoder().decode(ResolveResponse.self, from: data) else {
+                DispatchQueue.main.async { self.errorMessage = "Nu am putut decoda răspunsul /resolve" }
                 return
             }
-            do {
-                let session = try JSONDecoder().decode(ResolveResponse.self, from: data)
-                DispatchQueue.main.async {
-                    self.sessionKey = session.session_key
-                    self.sessionStart = session.date_start
-                    self.sessionEnd = session.date_end
-                    self.errorMessage = nil
-                    self.fetchDrivers(sessionKey: session.session_key)
-                }
-            } catch {
-                self.log("decode /resolve", error.localizedDescription)
-                DispatchQueue.main.async { self.errorMessage = "Nu am găsit sesiunea" }
+            DispatchQueue.main.async {
+                self.sessionKey = session.session_key
+                self.sessionStart = session.date_start
+                self.sessionEnd = session.date_end
+                self.errorMessage = nil
+                self.fetchDrivers(sessionKey: session.session_key)
             }
         }.resume()
     }
