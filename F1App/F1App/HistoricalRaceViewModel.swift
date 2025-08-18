@@ -190,17 +190,22 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func fetchLocations(sessionKey: Int) {
-        let formatter = ISO8601DateFormatter()
+        let backendFormatter = DateFormatter()
+        backendFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSSSSS"
+        backendFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        backendFormatter.locale = Locale(identifier: "en_US_POSIX")
+
         guard let startString = sessionStart,
-              let start = formatter.date(from: startString) else { return }
+              let start = backendFormatter.date(from: startString) else { return }
         let end: Date
-        if let endString = sessionEnd, let endDate = formatter.date(from: endString) {
+        if let endString = sessionEnd,
+           let endDate = backendFormatter.date(from: endString) {
             end = endDate
         } else {
             end = start.addingTimeInterval(3 * 60 * 60)
         }
-        let startStr = formatter.string(from: start)
-        let endStr = formatter.string(from: end)
+        let startStr = dateFormatter.string(from: start)
+        let endStr = dateFormatter.string(from: end)
         locationFetchCount = 0
         for driver in drivers {
             var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/location")!
