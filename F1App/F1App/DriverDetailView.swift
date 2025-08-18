@@ -23,10 +23,11 @@ struct DriverDetailView: View {
                 Text("Position: \(viewModel.position)")
                 Text("RPM: \(viewModel.rpm)")
                 Text("Speed: \(viewModel.speed)")
+                Text("Acceleration: \(viewModel.acceleration)")
                 Text("Brake: \(viewModel.brake)")
+                Text("DRS: \(viewModel.drs)")
                 Text("Number of laps: \(viewModel.numberOfLaps)")
-           //     Text("DSQ: \(viewModel.dsq ? \"Yes\" : \"No\")")
-           //     Text("Compound: \(viewModel.compound)")
+                Text("DSQ: \(viewModel.dsq ? \"Yes\" : \"No\")")
             }
             .padding()
         }
@@ -39,7 +40,9 @@ class DriverDetailViewModel: ObservableObject {
     @Published var position: String = "-"
     @Published var rpm: String = "-"
     @Published var speed: String = "-"
+    @Published var acceleration: String = "-"
     @Published var brake: String = "-"
+    @Published var drs: String = "-"
     @Published var numberOfLaps: Int = 0
     @Published var dsq: Bool = false
     @Published var compound: String = "-"
@@ -66,6 +69,13 @@ class DriverDetailViewModel: ObservableObject {
                 let rpm: Double?
                 let speed: Double?
                 let brake: Double?
+                let throttle: Double?
+                let drs: Int?
+
+                enum CodingKeys: String, CodingKey {
+                    case rpm, speed, brake, throttle
+                    case drs = "drs_status"
+                }
             }
             let position: Position?
             let lap: Lap?
@@ -100,7 +110,9 @@ class DriverDetailViewModel: ObservableObject {
                 if let car = driverEntry.car {
                     if let rpm = car.rpm { self.rpm = String(Int(rpm)) }
                     if let speed = car.speed { self.speed = String(format: "%.1f", speed) }
+                    if let throttle = car.throttle { self.acceleration = String(format: "%.1f", throttle) }
                     if let brake = car.brake { self.brake = String(format: "%.1f", brake) }
+                    if let drs = car.drs { self.drs = drs == 1 ? "On" : "Off" }
                 }
                 if let lap = driverEntry.lap {
                     self.numberOfLaps = lap.lap_number ?? 0
