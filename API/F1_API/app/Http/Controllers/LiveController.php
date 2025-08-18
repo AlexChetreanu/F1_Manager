@@ -14,59 +14,35 @@ class LiveController extends Controller
         $year = (int) $request->query('year');
         $meetingKey = $request->query('meeting_key');
         $circuitKey = $request->query('circuit_key');
-        $date = $request->query('date');
         $meetingName = $request->query('meeting_name');
         $sessionType = $request->query('session_type', 'Race');
 
-        if (! $year) {
-            return response()->json(['error' => 'Missing parameters'], 400);
+        if (! $year && ! $meetingKey) {
+            return response()->json(['error' => 'Missing year'], 400);
         }
 
         $db = DB::connection('openf1');
         $session = null;
 
         if ($meetingKey) {
+            // meeting_key are prioritate; year devine opțional aici
             $session = $db->table('sessions')
                 ->select('session_key', 'meeting_key', 'session_type', 'date_start', 'date_end')
-                ->join('meetings', 'sessions.meeting_key', '=', 'meetings.meeting_key')
-                ->where('meetings.year', $year)
-                ->where('sessions.session_type', $sessionType)
-                ->where('sessions.meeting_key', (int) $meetingKey)
+                ->where('meeting_key', (int) $meetingKey)
+                ->where('session_type', $sessionType)
                 ->first();
-        } elseif ($circuitKey && $date) {
-            try {
-                $parsedDate = Carbon::parse($date);
-            } catch (\Throwable $e) {
-                return response()->json(['error' => 'Invalid date'], 400);
+
+        } elseif ($circuitKey) {
+            // IGNORĂ 'date' dacă e trimis; caută meeting-ul pentru anul ALES + circuit
+            if (! $year) {
+                return response()->json(['error' => 'Missing year'], 400);
             }
 
-            $dayStart = $parsedDate->copy()->startOfDay();
-            $dayEnd   = $parsedDate->copy()->endOfDay();
-
-            // Construiește interogarea principală pe circuit + ziua respectivă.
-            // Dacă 'year' este prezent și se potrivește cu anul din 'date', aplică-l;
-            // altfel NU filtra după year (pentru a evita 404-uri false).
-            $meetingQuery = $db->table('meetings')
+            $meeting = $db->table('meetings')
+                ->where('year', (int) $year)
                 ->where('circuit_key', (int) $circuitKey)
-                ->whereBetween('date_start', [$dayStart, $dayEnd]);
-
-            if ($year && (int)$year === (int)$parsedDate->year) {
-                $meetingQuery->where('year', (int)$year);
-            }
-
-            $meeting = $meetingQuery->first();
-
-            // Fallback: caută în ±3 zile dacă nu găsește exact în acea zi
-            if (! $meeting) {
-                $meeting = $db->table('meetings')
-                    ->where('circuit_key', (int) $circuitKey)
-                    ->whereBetween('date_start', [
-                        $dayStart->copy()->subDays(3),
-                        $dayEnd->copy()->addDays(3),
-                    ])
-                    ->orderBy('date_start')
-                    ->first();
-            }
+                ->orderBy('date_start')
+                ->first();
 
             if ($meeting) {
                 $session = $db->table('sessions')
@@ -75,10 +51,13 @@ class LiveController extends Controller
                     ->where('session_type', $sessionType)
                     ->first();
             }
+
         } elseif ($meetingName) {
+            // fallback pe nume dacă nu există circuit_key/meeting_key
             $meeting = $db->table('meetings')
-                ->where('year', $year)
+                ->where('year', (int) $year)
                 ->whereRaw('LOWER(meeting_name) LIKE ?', ['%' . strtolower($meetingName) . '%'])
+                ->orderBy('date_start')
                 ->first();
 
             if ($meeting) {
