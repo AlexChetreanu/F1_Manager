@@ -93,11 +93,13 @@ class HistoricalRaceViewModel: ObservableObject {
             return
         }
 
+        let selectedDate = "\(selectedYear)\(race.date.dropFirst(4))"
+
         resolveSession(
             year: selectedYear,
             meetingKey: nil,
             circuitKey: circuitKey,
-            date: String(race.date.prefix(10))
+            date: selectedDate
         )
     }
 
