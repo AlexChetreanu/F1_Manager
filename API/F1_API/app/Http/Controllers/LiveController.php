@@ -40,11 +40,33 @@ class LiveController extends Controller
                 return response()->json(['error' => 'Invalid date'], 400);
             }
 
-            $meeting = $db->table('meetings')
-                ->where('year', $year)
+            $dayStart = $parsedDate->copy()->startOfDay();
+            $dayEnd   = $parsedDate->copy()->endOfDay();
+
+            // Construiește interogarea principală pe circuit + ziua respectivă.
+            // Dacă 'year' este prezent și se potrivește cu anul din 'date', aplică-l;
+            // altfel NU filtra după year (pentru a evita 404-uri false).
+            $meetingQuery = $db->table('meetings')
                 ->where('circuit_key', (int) $circuitKey)
-                ->whereDate('date_start', $parsedDate->toDateString())
-                ->first();
+                ->whereBetween('date_start', [$dayStart, $dayEnd]);
+
+            if ($year && (int)$year === (int)$parsedDate->year) {
+                $meetingQuery->where('year', (int)$year);
+            }
+
+            $meeting = $meetingQuery->first();
+
+            // Fallback: caută în ±3 zile dacă nu găsește exact în acea zi
+            if (! $meeting) {
+                $meeting = $db->table('meetings')
+                    ->where('circuit_key', (int) $circuitKey)
+                    ->whereBetween('date_start', [
+                        $dayStart->copy()->subDays(3),
+                        $dayEnd->copy()->addDays(3),
+                    ])
+                    ->orderBy('date_start')
+                    ->first();
+            }
 
             if ($meeting) {
                 $session = $db->table('sessions')
