@@ -82,15 +82,19 @@ class HistoricalRaceViewModel: ObservableObject {
             return
         }
 
-        // Derivează anul din data cursei (YYYY-MM-DD...)
-        let raceYear = Int(race.date.prefix(4)) ?? (Int(year) ?? 0)
-        if raceYear == 0 {
+        // Folosește anul introdus de utilizator dacă este valid, altfel extrage din data cursei
+        let selectedYear: Int
+        if !year.isEmpty, let userYear = Int(year) {
+            selectedYear = userYear
+        } else if let raceYear = Int(race.date.prefix(4)) {
+            selectedYear = raceYear
+        } else {
             errorMessage = "Data cursei invalidă"
             return
         }
 
         resolveSession(
-            year: raceYear,
+            year: selectedYear,
             meetingKey: nil,
             circuitKey: circuitKey,
             date: String(race.date.prefix(10))
