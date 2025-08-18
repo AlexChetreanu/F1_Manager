@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class LiveController extends Controller
 {
@@ -102,34 +101,6 @@ class LiveController extends Controller
         }
 
         return response()->json($data);
-    }
-
-    public function stream(Request $request)
-    {
-        $sessionKey = (int) $request->query('session_key');
-        if (! $sessionKey) {
-            return response()->json(['error' => 'Missing session_key'], 400);
-        }
-        $windowMs = (int) $request->query('window_ms', 2000);
-        $fieldsParam = $request->query('fields');
-        $allFields = ['drivers', 'position', 'lap', 'car', 'loc', 'weather', 'rc'];
-        $fields = $fieldsParam ? array_intersect($allFields, array_map('trim', explode(',', $fieldsParam))) : $allFields;
-
-        $response = new StreamedResponse(function () use ($sessionKey, $windowMs, $fields) {
-            while (connection_aborted() === 0) {
-                $payload = $this->snapshotInternal($sessionKey, $windowMs, $fields, null);
-                echo 'data: ' . json_encode($payload) . "\n\n";
-                ob_flush();
-                flush();
-                sleep(1);
-            }
-        });
-
-        $response->headers->set('Content-Type', 'text/event-stream');
-        $response->headers->set('Cache-Control', 'no-cache');
-        $response->headers->set('X-Accel-Buffering', 'no');
-
-        return $response;
     }
 
     private function snapshotInternal(int $sessionKey, int $windowMs, array $fields, ?Carbon $since): ?array
@@ -307,6 +278,217 @@ class LiveController extends Controller
         $out['since'] = Carbon::now()->toIso8601String();
 
         return $out;
+    }
+
+    private function buildDriverState(int $sessionKey, ?string $sinceIso, array $fields, bool $onlyChanged): array
+    {
+        $includeLoc = in_array('loc', $fields, true);
+        $includePos = in_array('pos', $fields, true);
+        $includeSpeed = in_array('speed', $fields, true);
+        $includeEngine = in_array('engine', $fields, true);
+
+        $db = DB::connection('openf1');
+
+        $drivers = $db->table('drivers')
+            ->where('session_key', $sessionKey)
+            ->select('driver_number', 'full_name', 'name_acronym', 'team_name', 'team_colour')
+            ->get()
+            ->keyBy('driver_number');
+
+        $sinceFilter = ($onlyChanged && $sinceIso) ? $sinceIso : null;
+
+        $latestLoc = collect();
+        if ($includeLoc) {
+            $baseLoc = $db->table('location')->where('session_key', $sessionKey);
+            if ($sinceFilter) {
+                $baseLoc->where('date', '>', $sinceFilter);
+            }
+            $latestLocSub = $baseLoc
+                ->select('driver_number', DB::raw('MAX(date) as max_date'))
+                ->groupBy('driver_number');
+            $latestLoc = $db->table('location as l')
+                ->joinSub($latestLocSub, 't', function ($j) {
+                    $j->on('l.driver_number', '=', 't.driver_number')
+                      ->on('l.date', '=', 't.max_date');
+                })
+                ->where('l.session_key', $sessionKey)
+                ->select('l.driver_number', 'l.date', 'l.x', 'l.y', 'l.z')
+                ->get()
+                ->keyBy('driver_number');
+        }
+
+        $latestPos = collect();
+        if ($includePos) {
+            $basePos = $db->table('position')->where('session_key', $sessionKey);
+            if ($sinceFilter) {
+                $basePos->where('date', '>', $sinceFilter);
+            }
+            $latestPosSub = $basePos
+                ->select('driver_number', DB::raw('MAX(date) as max_date'))
+                ->groupBy('driver_number');
+            $latestPos = $db->table('position as p')
+                ->joinSub($latestPosSub, 't', function ($j) {
+                    $j->on('p.driver_number', '=', 't.driver_number')
+                      ->on('p.date', '=', 't.max_date');
+                })
+                ->where('p.session_key', $sessionKey)
+                ->select('p.driver_number', 'p.date', 'p.position')
+                ->get()
+                ->keyBy('driver_number');
+        }
+
+        $latestCar = collect();
+        if ($includeSpeed || $includeEngine) {
+            $baseCar = $db->table('car_data')->where('session_key', $sessionKey);
+            if ($sinceFilter) {
+                $baseCar->where('date', '>', $sinceFilter);
+            }
+            $latestCarSub = $baseCar
+                ->select('driver_number', DB::raw('MAX(date) as max_date'))
+                ->groupBy('driver_number');
+            $columns = ['c.driver_number', 'c.date'];
+            if ($includeSpeed) {
+                $columns[] = 'c.speed';
+            }
+            if ($includeEngine) {
+                $columns = array_merge($columns, ['c.rpm', 'c.throttle', 'c.brake', 'c.n_gear', 'c.drs']);
+            }
+            $latestCar = $db->table('car_data as c')
+                ->joinSub($latestCarSub, 't', function ($j) {
+                    $j->on('c.driver_number', '=', 't.driver_number')
+                      ->on('c.date', '=', 't.max_date');
+                })
+                ->where('c.session_key', $sessionKey)
+                ->select($columns)
+                ->get()
+                ->keyBy('driver_number');
+        }
+
+        $sinceCarbon = $sinceIso ? Carbon::parse($sinceIso) : null;
+
+        $outDrivers = [];
+        foreach ($drivers as $dn => $meta) {
+            $state = [
+                'driver_number' => $dn,
+                'name' => $meta->full_name ?? $meta->name ?? null,
+                'acronym' => $meta->name_acronym ?? null,
+                'team_name' => $meta->team_name ?? null,
+                'team_colour' => $meta->team_colour ?? null,
+            ];
+
+            $lastDates = collect();
+
+            if ($includePos && ($p = $latestPos->get($dn))) {
+                $state['pos'] = $p->position;
+                $lastDates->push(Carbon::parse($p->date));
+            }
+
+            if ($includeLoc && ($l = $latestLoc->get($dn))) {
+                $state['x'] = $l->x;
+                $state['y'] = $l->y;
+                $state['z'] = $l->z;
+                $lastDates->push(Carbon::parse($l->date));
+            }
+
+            if (($includeSpeed || $includeEngine) && ($c = $latestCar->get($dn))) {
+                if ($includeSpeed) {
+                    $state['speed'] = $c->speed;
+                }
+                if ($includeEngine) {
+                    $state['rpm'] = $c->rpm;
+                    $state['throttle'] = $c->throttle;
+                    $state['brake'] = $c->brake;
+                    $state['n_gear'] = $c->n_gear;
+                    $state['drs'] = $c->drs;
+                }
+                $lastDates->push(Carbon::parse($c->date));
+            }
+
+            $last = $lastDates->max();
+            if ($onlyChanged && $sinceCarbon && $last && $last->lte($sinceCarbon)) {
+                continue;
+            }
+
+            $state['last'] = $last ? $last->toIso8601String() : null;
+            $outDrivers[] = $state;
+        }
+
+        return [
+            'ts' => Carbon::now()->toIso8601String(),
+            'session_key' => $sessionKey,
+            'drivers' => $outDrivers,
+        ];
+    }
+
+    public function snapshotAll(Request $request)
+    {
+        $sessionKey = (int) $request->query('session_key');
+        if (! $sessionKey) {
+            return response()->json(['error' => 'Missing session_key'], 400);
+        }
+
+        $since = $request->query('since');
+        $fieldsCsv = $request->query('fields', 'loc,pos,speed');
+        $fields = array_filter(array_map('trim', explode(',', $fieldsCsv)));
+
+        try {
+            $payload = $this->buildDriverState($sessionKey, $since, $fields, false);
+        } catch (\Throwable $e) {
+            \Log::error($e);
+            return response()->json(['error' => 'Server error'], 500);
+        }
+
+        return response()->json($payload);
+    }
+
+    public function stream(Request $request)
+    {
+        @ini_set('zlib.output_compression', '0');
+        @ini_set('implicit_flush', '1');
+        while (ob_get_level() > 0) { @ob_end_flush(); }
+        @set_time_limit(0);
+
+        $sessionKey = (int) $request->query('session_key');
+        if (! $sessionKey) {
+            return response('Missing session_key', 400);
+        }
+
+        $tickMs = max(250, (int) $request->query('tick_ms', 1000));
+        $durationSec = min(300, max(5, (int) $request->query('duration_sec', 30)));
+        $mode = strtolower($request->query('mode', 'delta'));
+        $onlyChanged = $mode !== 'full';
+        $fieldsCsv = $request->query('fields', 'loc,pos,speed');
+        $fields = array_filter(array_map('trim', explode(',', $fieldsCsv)));
+        $since = $request->query('since');
+
+        $headers = [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'Connection' => 'keep-alive',
+            'X-Accel-Buffering' => 'no',
+        ];
+
+        $start = microtime(true);
+        $callback = function () use ($sessionKey, $fields, $onlyChanged, $tickMs, $durationSec, $start, &$since) {
+            while (microtime(true) - $start < $durationSec) {
+                try {
+                    $payload = $this->buildDriverState($sessionKey, $since, $fields, $onlyChanged);
+                } catch (\Throwable $e) {
+                    \Log::error($e);
+                    $payload = ['ts' => Carbon::now()->toIso8601String(), 'session_key' => $sessionKey, 'drivers' => []];
+                }
+
+                echo "event: tick\n";
+                echo 'data: ' . json_encode($payload) . "\n\n";
+                @ob_flush();
+                @flush();
+
+                $since = $payload['ts'];
+                usleep($tickMs * 1000);
+            }
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 }
 
