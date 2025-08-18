@@ -3,6 +3,7 @@ import SwiftUI
 struct HistoricalRaceView: View {
     let race: Race
     @ObservedObject var viewModel: HistoricalRaceViewModel
+    @State private var showDebug = false
 
     var body: some View {
         VStack {
@@ -100,6 +101,12 @@ struct HistoricalRaceView: View {
                     Button("Viteză x\(Int(viewModel.playbackSpeed))") {
                         viewModel.cycleSpeed()
                     }
+                    if viewModel.debugEnabled {
+                        Button("Diagnose") {
+                            viewModel.runDiagnosis(for: race)
+                            showDebug = true
+                        }
+                    }
                 }
                 .padding(.bottom)
 
@@ -123,6 +130,14 @@ struct HistoricalRaceView: View {
                 .frame(maxHeight: 200)
             }
             Spacer()
+        }
+        .sheet(isPresented: $showDebug) {
+            VStack {
+                if let sum = viewModel.diagnosisSummary {
+                    Text(sum).font(.headline).padding()
+                }
+                DebugLogView(logger: viewModel.logger)
+            }
         }
     }
 }

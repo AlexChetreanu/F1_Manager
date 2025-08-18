@@ -9,6 +9,7 @@ use App\Http\Controllers\DriverController;
 use App\Http\Controllers\RaceController;
 use App\Http\Controllers\OpenF1Controller;
 use App\Http\Controllers\LiveController;
+use App\Http\Controllers\HealthController;
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
@@ -31,4 +32,5 @@ Route::get('/openf1/{table}', [OpenF1Controller::class, 'query']);
 Route::get('/live/resolve', [LiveController::class, 'resolveSession']);
 Route::get('/live/snapshot', [LiveController::class, 'snapshot']);
 Route::get('/live/stream', [LiveController::class, 'stream']);
+Route::get('/health', [HealthController::class, 'index']);
 
