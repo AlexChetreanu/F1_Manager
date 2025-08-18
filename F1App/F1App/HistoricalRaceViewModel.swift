@@ -70,39 +70,7 @@ class HistoricalRaceViewModel: ObservableObject {
             errorMessage = "Lipsește circuit_id"
             return
         }
-        fetchMeeting(year: yearInt, circuitKey: circuitKey)
-    }
-
-    private struct Meeting: Decodable {
-        let meeting_key: Int
-    }
-
-    private struct MeetingsResponse: Decodable {
-        let data: [Meeting]
-    }
-
-    private func fetchMeeting(year: Int, circuitKey: Int) {
-        var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/meetings")!
-        comps.queryItems = [
-            URLQueryItem(name: "year", value: String(year)),
-            URLQueryItem(name: "circuit_key", value: String(circuitKey))
-        ]
-        guard let url = comps.url else { return }
-        URLSession.shared.dataTask(with: url) { data, _, _ in
-            guard let data = data else {
-                DispatchQueue.main.async { self.errorMessage = "Nu am găsit cursa" }
-                return
-            }
-            let response = try? JSONDecoder().decode(MeetingsResponse.self, from: data)
-            guard let meeting = response?.data.first else {
-                DispatchQueue.main.async { self.errorMessage = "Nu am găsit cursa" }
-                return
-            }
-            DispatchQueue.main.async {
-                self.errorMessage = nil
-                self.resolveSession(meetingKey: meeting.meeting_key, year: year)
-            }
-        }.resume()
+        resolveSession(year: yearInt, meetingKey: nil, circuitKey: circuitKey, date: String(race.date.prefix(10)))
     }
 
     private func parseTrack(_ json: String?) {
@@ -132,15 +100,25 @@ class HistoricalRaceViewModel: ObservableObject {
         let date_end: String?
     }
 
-    private func resolveSession(meetingKey: Int, year: Int) {
+    private func resolveSession(year: Int, meetingKey: Int?, circuitKey: Int?, date: String?) {
         var comps = URLComponents(string: "\(APIConfig.baseURL)/api/live/resolve")!
-        comps.queryItems = [
+        var items = [
             URLQueryItem(name: "year", value: String(year)),
-            URLQueryItem(name: "meeting_key", value: String(meetingKey)),
             URLQueryItem(name: "session_type", value: "Race")
         ]
+        if let mk = meetingKey {
+            items.append(URLQueryItem(name: "meeting_key", value: String(mk)))
+        } else if let ck = circuitKey, let d = date {
+            items.append(URLQueryItem(name: "circuit_key", value: String(ck)))
+            items.append(URLQueryItem(name: "date", value: d))
+        }
+        comps.queryItems = items
         guard let url = comps.url else { return }
-        URLSession.shared.dataTask(with: url) { data, _, _ in
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            if let error = error {
+                DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /resolve: \(error.localizedDescription)" }
+                return
+            }
             guard let data = data,
                   let session = try? JSONDecoder().decode(ResolveResponse.self, from: data) else {
                 DispatchQueue.main.async { self.errorMessage = "Nu am găsit sesiunea" }
@@ -151,7 +129,7 @@ class HistoricalRaceViewModel: ObservableObject {
                 self.sessionStart = session.date_start
                 self.sessionEnd = session.date_end
                 self.errorMessage = nil
-                self.fetchDrivers(meetingKey: meetingKey, sessionKey: session.session_key)
+                self.fetchDrivers(sessionKey: session.session_key)
             }
         }.resume()
     }
@@ -164,11 +142,15 @@ class HistoricalRaceViewModel: ObservableObject {
         let data: [LocationPoint]
     }
 
-    private func fetchDrivers(meetingKey: Int, sessionKey: Int) {
+    private func fetchDrivers(sessionKey: Int) {
         var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/drivers")!
-        comps.queryItems = [URLQueryItem(name: "meeting_key", value: String(meetingKey))]
+        comps.queryItems = [URLQueryItem(name: "session_key", value: String(sessionKey))]
         guard let url = comps.url else { return }
-        URLSession.shared.dataTask(with: url) { data, _, _ in
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            if let error = error {
+                DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /drivers: \(error.localizedDescription)" }
+                return
+            }
             guard let data = data,
                   let response = try? JSONDecoder().decode(DriversResponse.self, from: data) else { return }
             let uniqueDrivers = Array(Set(response.data))
@@ -197,9 +179,10 @@ class HistoricalRaceViewModel: ObservableObject {
             comps.queryItems = [
                 URLQueryItem(name: "session_key", value: String(sessionKey)),
                 URLQueryItem(name: "driver_number", value: String(driver.driver_number)),
-                URLQueryItem(name: "date__gte", value: startStr),
-                URLQueryItem(name: "date__lte", value: endStr),
-                URLQueryItem(name: "order_by", value: "date")
+                URLQueryItem(name: "date__gt", value: startStr),
+                URLQueryItem(name: "date__lt", value: endStr),
+                URLQueryItem(name: "order_by", value: "date"),
+                URLQueryItem(name: "limit", value: "1000")
             ]
             guard let url = comps.url else { continue }
             URLSession.shared.dataTask(with: url) { data, _, error in
@@ -207,16 +190,23 @@ class HistoricalRaceViewModel: ObservableObject {
                     DispatchQueue.main.async {
                         self.locationFetchCount += 1
                         if self.locationFetchCount == self.drivers.count {
-                            self.errorMessage = self.positions.isEmpty ? "Date de locație indisponibile" : nil
-                            if !self.positions.isEmpty {
+                            if self.errorMessage != nil {
+                                return
+                            } else if self.positions.isEmpty {
+                                self.errorMessage = "Date indisponibile"
+                            } else {
                                 self.calculateLocationBounds()
                                 self.updatePositions()
                             }
                         }
                     }
                 }
-                guard error == nil, let data = data else { return }
-                guard let response = try? JSONDecoder().decode(LocationsResponse.self, from: data),
+                if let error = error {
+                    DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /location: \(error.localizedDescription)" }
+                    return
+                }
+                guard let data = data,
+                      let response = try? JSONDecoder().decode(LocationsResponse.self, from: data),
                       !response.data.isEmpty else { return }
                 DispatchQueue.main.async {
                     self.positions[driver.driver_number] = response.data

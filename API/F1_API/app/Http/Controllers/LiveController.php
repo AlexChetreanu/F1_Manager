@@ -13,26 +13,60 @@ class LiveController extends Controller
     {
         $year = (int) $request->query('year');
         $meetingKey = $request->query('meeting_key');
+        $circuitKey = $request->query('circuit_key');
+        $date = $request->query('date');
         $meetingName = $request->query('meeting_name');
         $sessionType = $request->query('session_type', 'Race');
 
-        if (! $year || (! $meetingKey && ! $meetingName)) {
+        if (! $year) {
             return response()->json(['error' => 'Missing parameters'], 400);
         }
 
-        $query = DB::connection('openf1')->table('sessions')
-            ->select('sessions.session_key', 'sessions.meeting_key', 'sessions.session_type', 'sessions.date_start', 'sessions.date_end')
-            ->join('meetings', 'sessions.meeting_key', '=', 'meetings.meeting_key')
-            ->where('meetings.year', $year)
-            ->where('sessions.session_type', $sessionType);
+        $db = DB::connection('openf1');
+        $session = null;
 
         if ($meetingKey) {
-            $query->where('sessions.meeting_key', (int) $meetingKey);
-        } else {
-            $query->whereRaw('LOWER(meetings.meeting_name) LIKE ?', ['%' . strtolower($meetingName) . '%']);
-        }
+            $session = $db->table('sessions')
+                ->select('session_key', 'meeting_key', 'session_type', 'date_start', 'date_end')
+                ->join('meetings', 'sessions.meeting_key', '=', 'meetings.meeting_key')
+                ->where('meetings.year', $year)
+                ->where('sessions.session_type', $sessionType)
+                ->where('sessions.meeting_key', (int) $meetingKey)
+                ->first();
+        } elseif ($circuitKey && $date) {
+            try {
+                $parsedDate = Carbon::parse($date);
+            } catch (\Throwable $e) {
+                return response()->json(['error' => 'Invalid date'], 400);
+            }
 
-        $session = $query->first();
+            $meeting = $db->table('meetings')
+                ->where('year', $year)
+                ->where('circuit_key', (int) $circuitKey)
+                ->whereDate('date_start', $parsedDate->toDateString())
+                ->first();
+
+            if ($meeting) {
+                $session = $db->table('sessions')
+                    ->select('session_key', 'meeting_key', 'session_type', 'date_start', 'date_end')
+                    ->where('meeting_key', $meeting->meeting_key)
+                    ->where('session_type', $sessionType)
+                    ->first();
+            }
+        } elseif ($meetingName) {
+            $meeting = $db->table('meetings')
+                ->where('year', $year)
+                ->whereRaw('LOWER(meeting_name) LIKE ?', ['%' . strtolower($meetingName) . '%'])
+                ->first();
+
+            if ($meeting) {
+                $session = $db->table('sessions')
+                    ->select('session_key', 'meeting_key', 'session_type', 'date_start', 'date_end')
+                    ->where('meeting_key', $meeting->meeting_key)
+                    ->where('session_type', $sessionType)
+                    ->first();
+            }
+        }
 
         if (! $session) {
             return response()->json(['error' => 'Session not found'], 404);

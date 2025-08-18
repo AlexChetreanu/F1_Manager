@@ -68,12 +68,20 @@ class OpenF1Controller extends Controller
             }
             $type = $schema->getColumnType($table, $base);
             if ($op === '__in') {
-                $vals = array_filter(array_map(function ($v) use ($type) {
+                $vals = array_filter(array_map(function ($v) use ($type, $base) {
+                    if ($base === 'date') {
+                        try { return Carbon::parse($v); } catch (\Throwable) { return null; }
+                    }
                     return $this->parseValue($type, $v);
                 }, explode(',', $value)));
                 $query->whereIn($base, $vals);
             } else {
-                $parsed = $this->parseValue($type, $value);
+                if ($base === 'date') {
+                    try { $parsed = Carbon::parse($value); }
+                    catch (\Throwable) { $parsed = $value; }
+                } else {
+                    $parsed = $this->parseValue($type, $value);
+                }
                 match ($op) {
                     '__gte' => $query->where($base, '>=', $parsed),
                     '__lte' => $query->where($base, '<=', $parsed),

@@ -2,7 +2,10 @@ import Foundation
 
 enum APIConfig {
     /// Base URL for API requests.
-    /// - Note: When running on a physical device, update this value to your computer's local network IP.
-    static let baseURL = "http://127.0.0.1:8000"
+    /// Defaults to `http://127.0.0.1:8000` but can be overridden using
+    /// `UserDefaults.standard.set("http://192.168.1.10:8000", forKey: "api_base_url")`.
+    static var baseURL: String {
+        UserDefaults.standard.string(forKey: "api_base_url") ?? "http://127.0.0.1:8000"
+    }
 }
 
