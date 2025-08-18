@@ -10,7 +10,12 @@ import SwiftUI
 struct CircuitView: View {
     let coordinatesJSON: String?
     @ObservedObject var viewModel: HistoricalRaceViewModel
-    @State private var selectedDriver: DriverInfo?
+    struct DriverSelection: Identifiable {
+        let driver: DriverInfo
+        let point: LocationPoint
+        var id: Int { driver.driver_number }
+    }
+    @State private var selectedDriver: DriverSelection?
 
     init(coordinatesJSON: String?, viewModel: HistoricalRaceViewModel) {
         self.coordinatesJSON = coordinatesJSON
@@ -68,7 +73,9 @@ struct CircuitView: View {
                         if let loc = viewModel.currentPosition[driver.driver_number] {
                             let p = viewModel.point(for: loc, in: geo.size)
                             Button {
-                                selectedDriver = driver
+                                if let loc = viewModel.currentPosition[driver.driver_number] {
+                                    selectedDriver = DriverSelection(driver: driver, point: loc)
+                                }
                             } label: {
                                 ZStack {
                                     Circle()
@@ -87,8 +94,10 @@ struct CircuitView: View {
                 .animation(.linear(duration: 1), value: viewModel.stepIndex)
                 .background(Color.gray.opacity(0.1))
                 .cornerRadius(8)
-                .sheet(item: $selectedDriver) { driver in
-                    DriverDetailView(driver: driver, sessionKey: viewModel.sessionKey)
+                .sheet(item: $selectedDriver) { selection in
+                    DriverDetailView(driver: selection.driver,
+                                     sessionKey: viewModel.sessionKey,
+                                     location: selection.point)
                 }
             }
         }
