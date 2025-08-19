@@ -95,8 +95,8 @@ class DriverDetailViewModel: ObservableObject {
         comps.queryItems = [
             URLQueryItem(name: "session_key", value: String(sessionKey)),
             URLQueryItem(name: "driver_number", value: String(driverNumber)),
-            URLQueryItem(name: "date>=", value: timestamp),
-            URLQueryItem(name: "date<=", value: endTimestamp),
+            URLQueryItem(name: "date__gte", value: timestamp),
+            URLQueryItem(name: "date__lt", value: endTimestamp),
             URLQueryItem(name: "limit", value: "1")
         ]
         guard let url = comps.url else { return }
