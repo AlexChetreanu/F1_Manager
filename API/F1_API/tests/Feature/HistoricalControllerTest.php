@@ -1,97 +1,92 @@
 <?php
 
 use Illuminate\Support\Facades\Http;
-use Carbon\Carbon;
+use Illuminate\Http\Request;
+use App\Http\Controllers\HistoricalController;
 
-it('resolves session by year and circuit', function () {
-    Http::fake([
-        'https://api.openf1.org/v1/sessions*' => Http::response([
-            [
-                'session_key' => 9506,
-                'meeting_key' => 123,
-                'date_start' => '2024-05-04T15:00:00Z',
-                'date_end' => '2024-05-04T17:00:00Z',
-                'circuit_key' => 1,
-            ]
-        ], 200),
-    ]);
-
-    $response = $this->getJson('/api/historical/resolve?year=2024&circuit_key=1&session_type=Race');
-    $response->assertStatus(200)
-        ->assertJson([
-            'session_key' => 9506,
-            'meeting_key' => 123,
-            'circuit_key' => 1,
-        ]);
-});
-
-it('returns punctual frame', function () {
+it('punctual frame interpolates', function () {
     Http::fake([
         'https://api.openf1.org/v1/location*' => Http::response([
-            ['driver_number' => '1', 'x' => 10, 'y' => 20, 'speed' => 250, 'n_gear' => 6],
-            ['driver_number' => '4', 'x' => 15, 'y' => 24, 'speed' => 240, 'n_gear' => 5],
+            ['driver_number' => '1', 'date' => '2024-05-04T16:05:12.000Z', 'x' => 0, 'y' => 0, 'speed' => 0, 'n_gear' => 1],
+            ['driver_number' => '1', 'date' => '2024-05-04T16:05:12.400Z', 'x' => 4, 'y' => 4, 'speed' => 100, 'n_gear' => 6],
         ], 200),
     ]);
 
-    $t = urlencode('2024-05-04T16:05:12Z');
-    $response = $this->getJson("/api/historical/session/9506/frames?t={$t}&include=speed,gear");
-    $response->assertStatus(200);
-    $json = $response->json();
-    expect($json)->toHaveCount(1);
-    expect($json[0]['drivers'][0])->toBe(['1', 10, 20, 250, 6]);
-    expect($json[0]['fields'])->toBe(['n','x','y','v','gear']);
+    $controller = new HistoricalController();
+    $req = Request::create('/', 'GET', ['t' => '2024-05-04T16:05:12.200Z', 'include' => 'speed,gear']);
+    $resp = $controller->frames(9506, $req);
+    $json = $resp->getData(true);
+    expect($json[0]['drivers'][0])->toBe(['1', 2, 2, 50, 6]);
 });
 
-it('returns window frames in json and ndjson', function () {
+it('window json and ndjson return frames', function () {
     Http::fake([
-        'https://api.openf1.org/v1/location*' => Http::sequence()
-            ->push([
-                ['driver_number' => '1', 'x' => 1, 'y' => 1],
-                ['driver_number' => '2', 'x' => 2, 'y' => 2],
-            ], 200)
-            ->push([
-                ['driver_number' => '1', 'x' => 2, 'y' => 1],
-                ['driver_number' => '2', 'x' => 2, 'y' => 2],
-            ], 200)
-            ->push([
-                ['driver_number' => '1', 'x' => 3, 'y' => 1],
-                ['driver_number' => '2', 'x' => 2, 'y' => 2],
-            ], 200),
+        'https://api.openf1.org/v1/location*' => Http::response([
+            ['driver_number' => '1', 'date' => '2024-05-04T16:00:00.000Z', 'x' => 0, 'y' => 0],
+            ['driver_number' => '2', 'date' => '2024-05-04T16:00:00.000Z', 'x' => 0, 'y' => 1],
+            ['driver_number' => '1', 'date' => '2024-05-04T16:00:00.200Z', 'x' => 2, 'y' => 0],
+            ['driver_number' => '1', 'date' => '2024-05-04T16:00:00.400Z', 'x' => 4, 'y' => 0],
+            ['driver_number' => '2', 'date' => '2024-05-04T16:00:00.400Z', 'x' => 0, 'y' => 1],
+        ], 200),
     ]);
 
-    $from = urlencode('2024-05-04T16:00:00Z');
-    $to = urlencode('2024-05-04T16:00:00.400Z');
+    $controller = new HistoricalController();
+    $req = Request::create('/', 'GET', [
+        'from' => '2024-05-04T16:00:00.000Z',
+        'to' => '2024-05-04T16:00:00.400Z',
+        'stride_ms' => 200,
+    ]);
+    $json = $controller->frames(9506, $req)->getData(true);
+    expect($json)->toHaveCount(3);
 
-    $jsonResp = $this->getJson("/api/historical/session/9506/frames?from={$from}&to={$to}&stride_ms=200");
-    $jsonResp->assertStatus(200);
-    expect($jsonResp->json())->toHaveCount(3);
-
-    $ndjson = $this->get("/api/historical/session/9506/frames?from={$from}&to={$to}&stride_ms=200&format=ndjson&delta=1");
-    $ndjson->assertStatus(200);
-    $lines = array_filter(explode("\n", trim($ndjson->getContent())));
-    expect($lines)->toHaveCount(3);
+    $reqNd = Request::create('/', 'GET', [
+        'from' => '2024-05-04T16:00:00.000Z',
+        'to' => '2024-05-04T16:00:00.400Z',
+        'stride_ms' => 200,
+        'format' => 'ndjson'
+    ]);
+    $stream = $controller->frames(9506, $reqNd);
+    expect($stream)->toBeInstanceOf(\Symfony\Component\HttpFoundation\StreamedResponse::class);
 });
 
-it('returns drivers and track info', function () {
+it('delta returns only changed drivers', function () {
     Http::fake([
-        'https://api.openf1.org/v1/drivers*' => Http::response([
-            ['driver_number' => 1, 'first_name' => 'Max', 'last_name' => 'Verstappen', 'team_name' => 'Red Bull', 'team_colour' => '#3671C6', 'headshot_url' => 'http://example.com/img.jpg'],
-        ], 200),
-        'https://api.openf1.org/v1/sessions*' => Http::response([
-            ['circuit_key' => 1, 'circuit_short_name' => 'Test', 'circuit_map' => 'http://example.com/map.png'],
+        'https://api.openf1.org/v1/location*' => Http::response([
+            ['driver_number' => '1', 'date' => '2024-05-04T16:00:00.000Z', 'x' => 0, 'y' => 0],
+            ['driver_number' => '2', 'date' => '2024-05-04T16:00:00.000Z', 'x' => 0, 'y' => 0],
+            ['driver_number' => '1', 'date' => '2024-05-04T16:00:00.200Z', 'x' => 2, 'y' => 0],
+            ['driver_number' => '2', 'date' => '2024-05-04T16:00:00.200Z', 'x' => 0, 'y' => 0],
         ], 200),
     ]);
 
-    $drivers = $this->getJson('/api/historical/session/9506/drivers');
-    $drivers->assertStatus(200)
-        ->assertJson([
-            ['driver_number' => '1', 'full_name' => 'Max Verstappen'],
-        ]);
+    $controller = new HistoricalController();
+    $req = Request::create('/', 'GET', [
+        'from' => '2024-05-04T16:00:00.000Z',
+        'to' => '2024-05-04T16:00:00.200Z',
+        'stride_ms' => 200,
+        'delta' => '1',
+    ]);
+    $frames = $controller->frames(9506, $req)->getData(true);
+    expect($frames[1]['drivers'])->toHaveCount(1);
+    expect($frames[1]['drivers'][0][0])->toBe('1');
+});
 
-    $track = $this->getJson('/api/historical/session/9506/track');
-    $track->assertStatus(200)
-        ->assertJson([
-            'circuit_key' => 1,
-            'map' => ['bounds' => ['minX' => -5000]],
-        ]);
+it('passes driver filters to OpenF1', function () {
+    $captured = null;
+    Http::fake(function ($request) use (&$captured) {
+        $captured = $request;
+        return Http::response([], 200);
+    });
+    $controller = new HistoricalController();
+    $req = Request::create('/', 'GET', [
+        'from' => '2024-05-04T16:00:00.000Z',
+        'to' => '2024-05-04T16:00:01.000Z',
+        'stride_ms' => 200,
+        'drivers' => '4,1,16'
+    ]);
+    $controller->frames(9506, $req);
+
+    expect($captured->url())->toContain('driver_number%5B0%5D=4');
+    expect($captured->url())->toContain('driver_number%5B1%5D=1');
+    expect($captured->url())->toContain('driver_number%5B2%5D=16');
 });

@@ -116,6 +116,8 @@ final class OneEuroFilter {
         self.dCutoff = dCutoff
     }
 
+    var last: Double { xFilter.last }
+
     func filter(value: Double, timestamp: Double) -> Double {
         guard value.isFinite else { return 0 }
         if let last = lastTime {
