@@ -87,7 +87,7 @@ struct HistoricalRaceView: View {
                 .padding()
 
                 if viewModel.currentPosition.isEmpty && viewModel.errorMessage == nil {
-                    Text("Date indisponibile")
+                    Text("Baza OpenF1 nu conține telemetrie pentru anul selectat")
                         .foregroundColor(.red)
                         .padding(.bottom)
                 }
@@ -139,6 +139,10 @@ struct HistoricalRaceView: View {
                 }
                 .frame(maxHeight: 200)
             }
+            Text("Telemetria pentru curse istorice este disponibilă doar pentru sezoanele recente. Dacă baza de date nu conține poziții pentru anul selectat, traseul nu poate fi afișat.")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+                .padding()
             Spacer()
         }
         .sheet(isPresented: $showDebug) {
