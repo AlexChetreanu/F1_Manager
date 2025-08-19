@@ -32,5 +32,6 @@ Route::get('/openf1/{table}', [OpenF1Controller::class, 'query']);
 Route::get('/live/resolve', [LiveController::class, 'resolveSession']);
 Route::get('/live/snapshot', [LiveController::class, 'snapshotAll']);
 Route::get('/live/stream',   [LiveController::class, 'stream']);
+Route::get('/live/history',  [LiveController::class, 'history']);
 Route::get('/health', [HealthController::class, 'index']);
 
