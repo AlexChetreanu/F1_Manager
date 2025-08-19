@@ -58,8 +58,6 @@ class HistoricalRaceViewModel: ObservableObject {
     private var trackBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationFetchCount = 0
-    private var locationCache: [String: [LocationPoint]] = [:]
-    private let batchSize = 5
 
     private func log(_ title: String, _ detail: String = "") {
         guard debugEnabled else { return }
@@ -83,20 +81,13 @@ class HistoricalRaceViewModel: ObservableObject {
             errorMessage = "Selectează un an valid"
             return
         }
-
-        if let circuitId = race.circuit_id, let circuitKey = Int(circuitId) {
-            // Rezolvă sesiunea folosind circuit_id atunci când este disponibil
-            resolveSession(year: yearInt, meetingKey: nil, circuitKey: circuitKey, meetingName: nil, date: nil)
-        } else {
-            // Fallback: încearcă să găsești sesiunea după numele cursei sau dată
-            let name = race.name
-            let date = race.date
-            if !name.isEmpty || !date.isEmpty {
-                resolveSession(year: yearInt, meetingKey: nil, circuitKey: nil, meetingName: name, date: date)
-            } else {
-                errorMessage = "Telemetria nu poate fi afișată fără date despre circuit"
-            }
+        guard let circuitId = race.circuit_id, let circuitKey = Int(circuitId) else {
+            errorMessage = "Lipsește circuit_id"
+            return
         }
+
+        // Rezolvă sesiunea DOAR cu year + circuit_key
+        resolveSession(year: yearInt, meetingKey: nil, circuitKey: circuitKey)
     }
 
     private func parseTrack(_ json: String?) {
@@ -126,7 +117,7 @@ class HistoricalRaceViewModel: ObservableObject {
         let date_end: String?
     }
 
-    private func resolveSession(year: Int, meetingKey: Int?, circuitKey: Int?, meetingName: String?, date: String?) {
+    private func resolveSession(year: Int, meetingKey: Int?, circuitKey: Int?) {
         var comps = URLComponents(string: "\(APIConfig.baseURL)/api/live/resolve")!
         var items = [
             URLQueryItem(name: "year", value: String(year)),
@@ -136,12 +127,6 @@ class HistoricalRaceViewModel: ObservableObject {
             items.append(URLQueryItem(name: "meeting_key", value: String(mk)))
         } else if let ck = circuitKey {
             items.append(URLQueryItem(name: "circuit_key", value: String(ck)))
-        }
-        if let name = meetingName, !name.isEmpty {
-            items.append(URLQueryItem(name: "meeting_name", value: name))
-        }
-        if let date = date, !date.isEmpty {
-            items.append(URLQueryItem(name: "date", value: String(date.prefix(10))))
         }
         comps.queryItems = items
 
@@ -223,61 +208,43 @@ class HistoricalRaceViewModel: ObservableObject {
         let endStr = dateFormatter.string(from: end)
         locationFetchCount = 0
 
-        let cachedDrivers = drivers.filter { locationCache["\(sessionKey)-\($0.driver_number)"] != nil }
-        let driversToFetch = drivers.filter { locationCache["\(sessionKey)-\($0.driver_number)"] == nil }
-
-        for driver in cachedDrivers {
-            if let cached = locationCache["\(sessionKey)-\(driver.driver_number)"] {
-                positions[driver.driver_number] = cached
-                currentPosition[driver.driver_number] = cached.first
-            }
-            driverFetchCompleted()
+        for driver in drivers {
+            fetchDriverLocations(driver: driver,
+                                 sessionKey: sessionKey,
+                                 startStr: startStr,
+                                 endStr: endStr,
+                                 offset: 0,
+                                 accumulated: [])
         }
 
-        let batches = stride(from: 0, to: driversToFetch.count, by: batchSize).map {
-            Array(driversToFetch[$0..<min($0 + batchSize, driversToFetch.count)])
-        }
-
-        for batch in batches {
-            fetchBatchLocations(drivers: batch,
-                                sessionKey: sessionKey,
-                                startStr: startStr,
-                                endStr: endStr,
-                                offset: 0,
-                                accumulated: [:])
-        }
-
-        func fetchBatchLocations(drivers: [DriverInfo],
-                                 sessionKey: Int,
-                                 startStr: String,
-                                 endStr: String,
-                                 offset: Int,
-                                 accumulated: [Int: [LocationPoint]]) {
+        func fetchDriverLocations(driver: DriverInfo,
+                                  sessionKey: Int,
+                                  startStr: String,
+                                  endStr: String,
+                                  offset: Int,
+                                  accumulated: [LocationPoint]) {
             var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/location")!
-            var items: [URLQueryItem] = [
+            comps.queryItems = [
                 URLQueryItem(name: "session_key", value: String(sessionKey)),
+                URLQueryItem(name: "driver_number", value: String(driver.driver_number)),
                 URLQueryItem(name: "date__gt", value: startStr),
                 URLQueryItem(name: "date__lt", value: endStr),
                 URLQueryItem(name: "order_by", value: "date"),
                 URLQueryItem(name: "limit", value: "1000"),
                 URLQueryItem(name: "offset", value: String(offset))
             ]
-            for d in drivers {
-                items.append(URLQueryItem(name: "driver_number", value: String(d.driver_number)))
-            }
-            comps.queryItems = items
             guard let url = comps.url else { return }
             URLSession.shared.dataTask(with: url) { data, resp, error in
                 self.log("GET /openf1/location", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
                 if let error = error {
                     DispatchQueue.main.async {
                         self.errorMessage = "Eroare rețea la /location: \(error.localizedDescription)"
-                        for _ in drivers { self.driverFetchCompleted() }
+                        self.driverFetchCompleted()
                     }
                     return
                 }
                 guard let data = data else {
-                    DispatchQueue.main.async { for _ in drivers { self.driverFetchCompleted() } }
+                    DispatchQueue.main.async { self.driverFetchCompleted() }
                     return
                 }
                 do {
@@ -289,31 +256,24 @@ class HistoricalRaceViewModel: ObservableObject {
                         }
                         return LocationPoint(driver_number: lp.driver_number, date: isoDate, x: lp.x, y: lp.y)
                     }
-                    var newAccum = accumulated
-                    for point in converted {
-                        newAccum[point.driver_number, default: []].append(point)
-                    }
+                    let newAccum = accumulated + converted
                     if response.data.count == 1000 {
-                        fetchBatchLocations(drivers: drivers,
-                                            sessionKey: sessionKey,
-                                            startStr: startStr,
-                                            endStr: endStr,
-                                            offset: offset + 1000,
-                                            accumulated: newAccum)
+                        fetchDriverLocations(driver: driver,
+                                             sessionKey: sessionKey,
+                                             startStr: startStr,
+                                             endStr: endStr,
+                                             offset: offset + 1000,
+                                             accumulated: newAccum)
                     } else {
                         DispatchQueue.main.async {
-                            for d in drivers {
-                                let arr = newAccum[d.driver_number] ?? []
-                                self.positions[d.driver_number] = arr
-                                self.currentPosition[d.driver_number] = arr.first
-                                self.locationCache["\(sessionKey)-\(d.driver_number)"] = arr
-                                self.driverFetchCompleted()
-                            }
+                            self.positions[driver.driver_number] = newAccum
+                            self.currentPosition[driver.driver_number] = newAccum.first
+                            self.driverFetchCompleted()
                         }
                     }
                 } catch {
                     self.log("decode /location", error.localizedDescription)
-                    DispatchQueue.main.async { for _ in drivers { self.driverFetchCompleted() } }
+                    DispatchQueue.main.async { self.driverFetchCompleted() }
                 }
             }.resume()
         }
@@ -325,7 +285,7 @@ class HistoricalRaceViewModel: ObservableObject {
             if errorMessage != nil {
                 return
             } else if positions.isEmpty {
-                errorMessage = "Baza OpenF1 nu conține telemetrie pentru anul selectat"
+                errorMessage = "Date indisponibile"
             } else {
                 calculateLocationBounds()
                 updatePositions()
