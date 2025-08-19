@@ -4,7 +4,13 @@ struct HistoricalRaceView: View {
     let race: Race
     @ObservedObject var viewModel: HistoricalRaceViewModel
     @State private var showDebug = false
-    @State private var selectedDriver: DriverInfo?
+    struct DriverSelection: Identifiable {
+        let driver: DriverInfo
+        let point: LocationPoint
+        var id: Int { driver.driver_number }
+    }
+
+    @State private var selectedDriver: DriverSelection?
 
     var body: some View {
         VStack {
@@ -58,7 +64,7 @@ struct HistoricalRaceView: View {
                                             .frame(width: 8, height: 8)
                                             .position(point)
                                             .onTapGesture {
-                                                selectedDriver = driver
+                                                selectedDriver = DriverSelection(driver: driver, point: loc)
                                             }
                                         Text(driver.initials)
                                             .font(.caption2)
@@ -143,8 +149,10 @@ struct HistoricalRaceView: View {
                 DebugLogView(logger: viewModel.logger)
             }
         }
-        .sheet(item: $selectedDriver) { driver in
-            DriverDetailView(driver: driver, sessionKey: viewModel.sessionKey)
+        .sheet(item: $selectedDriver) { selection in
+            DriverDetailView(driver: selection.driver,
+                             sessionKey: viewModel.sessionKey,
+                             location: selection.point)
         }
     }
 }
