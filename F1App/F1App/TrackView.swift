@@ -45,7 +45,7 @@ struct TrackView: View {
         }
     }
 
-    private func position(for driver: DriverPos, in size: CGSize) -> CGPoint {
+    func position(for driver: DriverPos, in size: CGSize) -> CGPoint {
         let b = track.bounds
         let w = max(b.maxX - b.minX, 1)
         let h = max(b.maxY - b.minY, 1)
