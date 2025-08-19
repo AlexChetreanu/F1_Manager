@@ -49,8 +49,7 @@ public final class PositionResampler {
                 let dx = s.x - prev.x
                 let dy = s.y - prev.y
                 if (dx*dx + dy*dy).squareRoot() > 400 { // outlier clamp
-                    filterX.reset(to: s.x, timestamp: t)
-                    filterY.reset(to: s.y, timestamp: t)
+                    
                     s.x = filterX.last
                     s.y = filterY.last
                 }
