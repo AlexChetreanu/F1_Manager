@@ -112,6 +112,7 @@ final class HistoricalStreamService {
             URLQueryItem(name: "to", value: ISO8601DateFormatter().string(from: to)),
             URLQueryItem(name: "stride_ms", value: String(strideMs)),
             URLQueryItem(name: "format", value: format),
+            URLQueryItem(name: "gap_ms", value: "1500"),
         ]
         if let drivers = drivers { items.append(URLQueryItem(name: "drivers", value: drivers.map(String.init).joined(separator: ","))) }
         if delta { items.append(URLQueryItem(name: "delta", value: "1")) }
