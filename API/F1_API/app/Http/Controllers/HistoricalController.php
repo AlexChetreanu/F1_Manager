@@ -73,7 +73,7 @@ class HistoricalController extends Controller
                 'start' => $start,
                 'end' => $end,
                 'duration_ms' => $durationMs,
-                'sample_rate_hz' => 5,
+                'sample_rate_hz' => 10,
             ],
             'resources' => [
                 'drivers' => "/historical/session/$sessionKey/drivers",
@@ -208,7 +208,7 @@ class HistoricalController extends Controller
         $drivers = array_filter(explode(',', $request->query('drivers', '')));
         $format = $request->query('format', 'json');
         $delta = filter_var($request->query('delta'), FILTER_VALIDATE_BOOLEAN);
-        $gapMs = (int) $request->query('gap_ms', 1000);
+        $gapMs = (int) $request->query('gap_ms', 1500);
 
         if ($t) {
             $ts = Carbon::parse($t);
@@ -324,22 +324,33 @@ class HistoricalController extends Controller
             $indices[$n] = $idx;
             $prev = $samples[$idx] ?? null;
             $next = $samples[$idx + 1] ?? null;
+            $pm1 = $samples[max(0, $idx - 1)] ?? null;
+            $pp2 = $samples[min(count($samples) - 1, $idx + 2)] ?? null;
 
             $x = $prev['x'] ?? $next['x'] ?? null;
             $y = $prev['y'] ?? $next['y'] ?? null;
             $v = $prev['speed'] ?? $next['speed'] ?? null;
             $gear = $prev['gear'] ?? $next['gear'] ?? null;
 
-            if ($prev && $next && $next['t'] > $prev['t'] && ($next['t'] - $prev['t']) <= $gapMs) {
+            if ($prev && $next && $pm1 && $pp2 && ($next['t'] > $prev['t']) && (($next['t'] - $prev['t']) <= $gapMs)) {
+                $u = ($tMs - $prev['t']) / max($next['t'] - $prev['t'], 1);
+                [$x, $y] = $this->catmull2([
+                    $pm1['x'], $pm1['y']
+                ], [
+                    $prev['x'], $prev['y']
+                ], [
+                    $next['x'], $next['y']
+                ], [
+                    $pp2['x'], $pp2['y']
+                ], $u);
+                if (in_array('speed', $include, true)) { $v = $this->lerp($prev['speed'], $next['speed'], $u); }
+            } elseif ($prev && $next && ($next['t'] > $prev['t']) && (($next['t'] - $prev['t']) <= $gapMs)) {
                 $u = ($tMs - $prev['t']) / max($next['t'] - $prev['t'], 1);
                 $x = $this->lerp($prev['x'], $next['x'], $u);
                 $y = $this->lerp($prev['y'], $next['y'], $u);
-                if (in_array('speed', $include, true)) {
-                    $v = $this->lerp($prev['speed'], $next['speed'], $u);
-                }
-                if (in_array('gear', $include, true)) {
-                    $gear = $next['gear'] ?? $prev['gear'];
-                }
+                if (in_array('speed', $include, true)) { $v = $this->lerp($prev['speed'], $next['speed'], $u); }
+            } else {
+                // hold/teleport: keep last or next available values
             }
 
             $row = [(string) $n, $x, $y];
@@ -353,6 +364,18 @@ class HistoricalController extends Controller
             'drivers' => $drivers,
             'fields' => $fields,
         ];
+    }
+
+    private function catmull2(array $p0, array $p1, array $p2, array $p3, float $t): array
+    {
+        $t2 = $t * $t; $t3 = $t2 * $t;
+        $a = -0.5*$t3 +     $t2 - 0.5*$t;
+        $b =  1.5*$t3 - 2.5*$t2 + 1.0;
+        $c = -1.5*$t3 + 2.0*$t2 + 0.5*$t;
+        $d =  0.5*$t3 - 0.5*$t2;
+        $x = $a*$p0[0] + $b*$p1[0] + $c*$p2[0] + $d*$p3[0];
+        $y = $a*$p0[1] + $b*$p1[1] + $c*$p2[1] + $d*$p3[1];
+        return [$x, $y];
     }
 
     private function lerp($a, $b, $u)
