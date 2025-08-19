@@ -356,15 +356,13 @@ class HistoricalRaceViewModel: ObservableObject {
         }
         let scaled = interval / playbackSpeed
         currentStepDuration = scaled
-        let newTimer = Timer(timeInterval: scaled, repeats: false) { _ in
-            withAnimation(.easeInOut(duration: self.currentStepDuration)) {
+        timer = Timer.scheduledTimer(withTimeInterval: scaled, repeats: false) { _ in
+            withAnimation(.linear(duration: self.currentStepDuration)) {
                 self.stepIndex += 1
                 self.updatePositions()
             }
             self.scheduleNextStep()
         }
-        RunLoop.main.add(newTimer, forMode: .common)
-        timer = newTimer
     }
 
     private func timeIntervalForStep(_ index: Int) -> TimeInterval? {
