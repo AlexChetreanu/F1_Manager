@@ -36,7 +36,6 @@ struct TrackView: View {
                             .frame(width: 10, height: 10)
                             .position(position(for: d, in: geo.size))
                             .transition(.opacity)
-                            .animation(.linear(duration: 0.15), value: d.id)
                     }
                 }
             } else {

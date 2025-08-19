@@ -42,6 +42,8 @@ import SwiftUI
         pause()
         if let key = sessionKey {
             buffer.removeAll()
+            self.fx.removeAll()
+            self.fy.removeAll()
             prefetch(from: time, to: time.addingTimeInterval(10))
         }
     }
@@ -52,10 +54,10 @@ import SwiftUI
         }
     }
 
-    func tick() {
+    private func tick() {
         guard isPlaying else { return }
-        guard !buffer.isEmpty else { return }
-        let frame = buffer.removeFirst()
+        guard let frame = buffer.first else { return }
+        buffer.removeFirst()
         currentFrame = frame
 
         guard let nIdx = frame.fields.firstIndex(of: "n"),
@@ -63,23 +65,33 @@ import SwiftUI
               let yIdx = frame.fields.firstIndex(of: "y") else { return }
 
         var positions: [TrackView.DriverPos] = []
+        positions.reserveCapacity(frame.drivers.count)
         let t = frame.t.timeIntervalSince1970
+
         for row in frame.drivers {
             guard nIdx < row.count, xIdx < row.count, yIdx < row.count,
                   let id = row[nIdx].string else { continue }
             let x0 = row[xIdx].double ?? 0
             let y0 = row[yIdx].double ?? 0
+
             let fx = self.fx[id] ?? OneEuroFilter()
             let fy = self.fy[id] ?? OneEuroFilter()
-            self.fx[id] = fx
-            self.fy[id] = fy
+            self.fx[id] = fx; self.fy[id] = fy
+
             let xs = fx.filter(value: x0, timestamp: t)
             let ys = fy.filter(value: y0, timestamp: t)
-            positions.append(TrackView.DriverPos(id: id, x: xs, y: ys, color: .red))
-        }
-        currentPositions = positions
 
-        if buffer.count < 5, let key = sessionKey {
+            positions.append(.init(id: id, x: xs, y: ys, color: .red))
+        }
+
+        // Animăm între cadre pe durata stride-ului (ajustat cu viteza)
+        let dur = Double(strideMs) / 1000.0 / max(0.1, speed)
+        withAnimation(.linear(duration: dur)) {
+            self.currentPositions = positions
+        }
+
+        // Prefetch dacă mai avem puțin în buffer
+        if buffer.count < 5, let _ = sessionKey {
             let start = frame.t.addingTimeInterval(Double(strideMs) / 1000.0)
             let end = start.addingTimeInterval(4)
             prefetch(from: start, to: end)

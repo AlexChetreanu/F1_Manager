@@ -146,6 +146,12 @@ class HistoricalController extends Controller
                     $maxY = max($maxY, $loc['y']);
                 }
             }
+
+            $padX = ($maxX - $minX) * 0.05;
+            $padY = ($maxY - $minY) * 0.05;
+            $minX -= $padX; $maxX += $padX;
+            $minY -= $padY; $maxY += $padY;
+
             return [
                 'minX' => $minX,
                 'minY' => $minY,
@@ -154,24 +160,19 @@ class HistoricalController extends Controller
             ];
         });
 
-        if (! $bounds) {
-            $bounds = [
-                'minX' => -5000,
-                'minY' => -5000,
-                'maxX' =>  5000,
-                'maxY' =>  5000,
-            ];
-        }
-
-        $track = [
+        return response()->json([
             'circuit_key' => $session['circuit_key'],
             'name' => $session['circuit_short_name'] ?? $session['circuit_full_name'] ?? 'Unknown',
             'map' => [
                 'image_url' => $session['circuit_map'] ?? '',
-                'bounds' => $bounds,
+                'bounds' => $bounds ?: [
+                    'minX' => -5000,
+                    'minY' => -5000,
+                    'maxX' => 5000,
+                    'maxY' => 5000,
+                ],
             ],
-        ];
-        return response()->json($track);
+        ]);
     }
 
     /** Proxy session events. */

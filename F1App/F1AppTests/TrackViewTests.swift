@@ -11,4 +11,11 @@ final class TrackViewTests: XCTestCase {
         let p = view.position(for: driver, in: .init(width: 0, height: 0))
         XCTAssert(p.x.isFinite && p.y.isFinite)
     }
+
+    func testNoExplicitAnimation() throws {
+        let base = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let srcURL = base.appendingPathComponent("F1App/TrackView.swift")
+        let src = try String(contentsOf: srcURL)
+        XCTAssertFalse(src.contains(".animation("))
+    }
 }

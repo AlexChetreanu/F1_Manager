@@ -46,7 +46,12 @@ it('window json and ndjson return frames', function () {
         'format' => 'ndjson'
     ]);
     $stream = $controller->frames(9506, $reqNd);
-    expect($stream)->toBeInstanceOf(\Symfony\Component\HttpFoundation\StreamedResponse::class);
+    ob_start(); // outer
+    ob_start(); // inner
+    $stream->sendContent();
+    ob_get_clean(); // discard inner
+    $out = trim(ob_get_clean());
+    expect(explode("\n", $out))->toHaveCount(3);
 });
 
 it('delta returns only changed drivers', function () {
@@ -89,4 +94,25 @@ it('passes driver filters to OpenF1', function () {
     expect($captured->url())->toContain('driver_number%5B0%5D=4');
     expect($captured->url())->toContain('driver_number%5B1%5D=1');
     expect($captured->url())->toContain('driver_number%5B2%5D=16');
+});
+
+it('track returns padded bounds without nesting', function () {
+    Http::fake([
+        'https://api.openf1.org/v1/sessions*' => Http::response([
+            ['session_key' => 9506, 'circuit_key' => 3, 'circuit_short_name' => 'Test', 'circuit_map' => 'http://map', 'date_start' => '2024-05-04T16:00:00.000Z']
+        ], 200),
+        'https://api.openf1.org/v1/location*' => Http::response([
+            ['x' => 0, 'y' => 0],
+            ['x' => 10, 'y' => 20],
+        ], 200),
+    ]);
+    $controller = new HistoricalController();
+    $resp = $controller->track(9506);
+    $json = $resp->getData(true);
+    expect($json['map']['bounds'])->toHaveKeys(['minX','minY','maxX','maxY']);
+    expect($json['map']['bounds'])->not->toHaveKey('bounds');
+    expect($json['map']['bounds']['minX'])->toBe(-0.5);
+    expect($json['map']['bounds']['maxX'])->toBe(10.5);
+    expect($json['map']['bounds']['minY'])->toBe(-1);
+    expect($json['map']['bounds']['maxY'])->toBe(21);
 });
