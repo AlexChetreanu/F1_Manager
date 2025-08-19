@@ -82,7 +82,7 @@ class HistoricalController extends Controller
                 'laps'    => "/historical/session/$sessionKey/laps",
                 'frames'  => [
                     'by_time' => "/historical/session/$sessionKey/frames?t={iso8601}",
-                    'window'  => "/historical/session/$sessionKey/frames?from={iso}&to={iso}&stride_ms=200&format=ndjson",
+                    'window'  => "/historical/session/$sessionKey/frames?from={iso}&to={iso}&stride_ms=100&format=ndjson",
                 ],
             ],
         ]);
@@ -302,6 +302,18 @@ class HistoricalController extends Controller
         }
 
         ksort($groups, SORT_NATURAL);
+
+        foreach ($groups as &$samples) {
+            $count = count($samples);
+            for ($k = 0; $k < $count; $k++) {
+                $xPrev = $samples[$k-1]['x'] ?? null; $xCur = $samples[$k]['x'] ?? null; $xNext = $samples[$k+1]['x'] ?? null;
+                $yPrev = $samples[$k-1]['y'] ?? null; $yCur = $samples[$k]['y'] ?? null; $yNext = $samples[$k+1]['y'] ?? null;
+                if ($xPrev !== null && $xCur !== null && $xNext !== null) { $samples[$k]['x'] = $this->median3($xPrev, $xCur, $xNext); }
+                if ($yPrev !== null && $yCur !== null && $yNext !== null) { $samples[$k]['y'] = $this->median3($yPrev, $yCur, $yNext); }
+            }
+        }
+        unset($samples);
+
         return $groups;
     }
 
@@ -334,15 +346,10 @@ class HistoricalController extends Controller
 
             if ($prev && $next && $pm1 && $pp2 && ($next['t'] > $prev['t']) && (($next['t'] - $prev['t']) <= $gapMs)) {
                 $u = ($tMs - $prev['t']) / max($next['t'] - $prev['t'], 1);
-                [$x, $y] = $this->catmull2([
-                    $pm1['x'], $pm1['y']
-                ], [
-                    $prev['x'], $prev['y']
-                ], [
-                    $next['x'], $next['y']
-                ], [
-                    $pp2['x'], $pp2['y']
-                ], $u);
+                [$x, $y] = $this->catmull2_centripetal(
+                    [$pm1['x'], $pm1['y']], [$prev['x'], $prev['y']],
+                    [$next['x'], $next['y']], [$pp2['x'], $pp2['y']], $u
+                );
                 if (in_array('speed', $include, true)) { $v = $this->lerp($prev['speed'], $next['speed'], $u); }
             } elseif ($prev && $next && ($next['t'] > $prev['t']) && (($next['t'] - $prev['t']) <= $gapMs)) {
                 $u = ($tMs - $prev['t']) / max($next['t'] - $prev['t'], 1);
@@ -366,6 +373,43 @@ class HistoricalController extends Controller
         ];
     }
 
+    private function catmull2_centripetal(array $p0, array $p1, array $p2, array $p3, float $t): array {
+        $alpha = 0.5; // centripetal
+        $d01 = pow(hypot($p1[0]-$p0[0], $p1[1]-$p0[1]), $alpha);
+        $d12 = pow(hypot($p2[0]-$p1[0], $p2[1]-$p1[1]), $alpha);
+        $d23 = pow(hypot($p3[0]-$p2[0], $p3[1]-$p2[1]), $alpha);
+        $t0 = 0.0;
+        $t1 = $t0 + $d01 + 1e-9;
+        $t2 = $t1 + $d12 + 1e-9;
+        $t3 = $t2 + $d23 + 1e-9;
+        $s  = $t1 + ($t2 - $t1) * max(0.0, min(1.0, $t));
+
+        $A1 = [
+            ($t1-$s)/($t1-$t0)*$p0[0] + ($s-$t0)/($t1-$t0)*$p1[0],
+            ($t1-$s)/($t1-$t0)*$p0[1] + ($s-$t0)/($t1-$t0)*$p1[1]
+        ];
+        $A2 = [
+            ($t2-$s)/($t2-$t1)*$p1[0] + ($s-$t1)/($t2-$t1)*$p2[0],
+            ($t2-$s)/($t2-$t1)*$p1[1] + ($s-$t1)/($t2-$t1)*$p2[1]
+        ];
+        $A3 = [
+            ($t3-$s)/($t3-$t2)*$p2[0] + ($s-$t2)/($t3-$t2)*$p3[0],
+            ($t3-$s)/($t3-$t2)*$p2[1] + ($s-$t2)/($t3-$t2)*$p3[1]
+        ];
+        $B1 = [
+            ($t2-$s)/($t2-$t0)*$A1[0] + ($s-$t0)/($t2-$t0)*$A2[0],
+            ($t2-$s)/($t2-$t0)*$A1[1] + ($s-$t0)/($t2-$t0)*$A2[1]
+        ];
+        $B2 = [
+            ($t3-$s)/($t3-$t1)*$A2[0] + ($s-$t1)/($t3-$t1)*$A3[0],
+            ($t3-$s)/($t3-$t1)*$A2[1] + ($s-$t1)/($t3-$t1)*$A3[1]
+        ];
+        return [
+            ($t2-$s)/($t2-$t1)*$B1[0] + ($s-$t1)/($t2-$t1)*$B2[0],
+            ($t2-$s)/($t2-$t1)*$B1[1] + ($s-$t1)/($t2-$t1)*$B2[1]
+        ];
+    }
+
     private function catmull2(array $p0, array $p1, array $p2, array $p3, float $t): array
     {
         $t2 = $t * $t; $t3 = $t2 * $t;
@@ -377,6 +421,8 @@ class HistoricalController extends Controller
         $y = $a*$p0[1] + $b*$p1[1] + $c*$p2[1] + $d*$p3[1];
         return [$x, $y];
     }
+
+    private function median3($a,$b,$c){ return $a > $b ? ($b > $c ? $b : ($a > $c ? $c : $a)) : ($a > $c ? $a : ($b > $c ? $c : $b)); }
 
     private function lerp($a, $b, $u)
     {
