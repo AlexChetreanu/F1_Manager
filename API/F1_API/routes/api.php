@@ -10,6 +10,7 @@ use App\Http\Controllers\RaceController;
 use App\Http\Controllers\OpenF1Controller;
 use App\Http\Controllers\LiveController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\HistoricalController;
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
@@ -33,5 +34,14 @@ Route::get('/live/resolve', [LiveController::class, 'resolveSession']);
 Route::get('/live/snapshot', [LiveController::class, 'snapshotAll']);
 Route::get('/live/stream',   [LiveController::class, 'stream']);
 Route::get('/live/history',  [LiveController::class, 'history']);
+Route::prefix('historical')->middleware('throttle:120,1')->group(function () {
+    Route::get('/resolve', [HistoricalController::class, 'resolve']);
+    Route::get('/session/{session_key}/manifest', [HistoricalController::class, 'manifest']);
+    Route::get('/session/{session_key}/drivers', [HistoricalController::class, 'drivers']);
+    Route::get('/session/{session_key}/track', [HistoricalController::class, 'track']);
+    Route::get('/session/{session_key}/events', [HistoricalController::class, 'events']);
+    Route::get('/session/{session_key}/laps', [HistoricalController::class, 'laps']);
+    Route::get('/session/{session_key}/frames', [HistoricalController::class, 'frames']);
+});
 Route::get('/health', [HealthController::class, 'index']);
 
