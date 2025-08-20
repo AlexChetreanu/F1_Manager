@@ -33,6 +33,15 @@ struct RaceControlMessage: Identifiable, Decodable {
     let id = UUID()
     let details: [String: String]
 
+    private static let dateFormatter = ISO8601DateFormatter()
+
+    var date: Date? {
+        if let ds = details["date"] ?? details["utc"] ?? details["session_time"] {
+            return RaceControlMessage.dateFormatter.date(from: ds)
+        }
+        return nil
+    }
+
     struct DynamicCodingKeys: CodingKey {
         var stringValue: String
         init?(stringValue: String) { self.stringValue = stringValue }
@@ -93,6 +102,7 @@ class HistoricalRaceViewModel: ObservableObject {
     private var trackBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationFetchCount = 0
+    private var allRaceControlMessages: [RaceControlMessage] = []
 
     private func log(_ title: String, _ detail: String = "") {
         guard debugEnabled else { return }
@@ -111,6 +121,7 @@ class HistoricalRaceViewModel: ObservableObject {
         positions.removeAll()
         currentPosition.removeAll()
         raceControlMessages.removeAll()
+        allRaceControlMessages.removeAll()
         parseTrack(race.coordinates)
 
         guard let yearInt = Int(year) else {
@@ -243,7 +254,12 @@ class HistoricalRaceViewModel: ObservableObject {
             guard let data = data else { return }
             do {
                 let response = try JSONDecoder().decode(RaceControlResponse.self, from: data)
-                DispatchQueue.main.async { self.raceControlMessages = response.data }
+                DispatchQueue.main.async {
+                    self.allRaceControlMessages = response.data.sorted {
+                        ($0.date ?? Date.distantFuture) < ($1.date ?? Date.distantFuture)
+                    }
+                    self.raceControlMessages.removeAll()
+                }
             } catch {
                 self.log("decode /race_control", error.localizedDescription)
             }
@@ -406,6 +422,20 @@ class HistoricalRaceViewModel: ObservableObject {
             if let arr = positions[driver.driver_number], stepIndex < arr.count {
                 currentPosition[driver.driver_number] = arr[stepIndex]
             }
+        }
+        updateRaceControlMessages()
+    }
+
+    private func currentSessionTime() -> Date? {
+        let times = currentPosition.values.compactMap { dateFormatter.date(from: $0.date) }
+        return times.min()
+    }
+
+    private func updateRaceControlMessages() {
+        guard let current = currentSessionTime() else { return }
+        raceControlMessages = allRaceControlMessages.filter { msg in
+            if let d = msg.date { return d <= current }
+            return false
         }
     }
 
