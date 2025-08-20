@@ -18,7 +18,7 @@
       <option value="$PROJECT_DIR$/API/F1_API/composer.json" />
     </option>
   </component>
-  <component name="ComposerSettings" synchronizationState="SYNCHRONIZE">
+  <component name="ComposerSettings" notifyAboutMissingVendor="false" synchronizationState="SYNCHRONIZE">
     <pharConfigPath>$PROJECT_DIR$/API/composer.json</pharConfigPath>
     <execution />
   </component>
@@ -332,6 +332,7 @@
       <updated>1755097688252</updated>
       <workItem from="1755097689392" duration="10646000" />
       <workItem from="1755259188236" duration="609000" />
+      <workItem from="1755637070607" duration="1317000" />
     </task>
     <servers />
   </component>
