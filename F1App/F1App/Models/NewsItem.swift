@@ -12,7 +12,7 @@ struct NewsItem: Identifiable, Decodable {
     let title: String
     let link: String
     let publishedAt: Date
-    let imageUrl: String?
+    let imageUrl: URL?
     let source: String
     let excerpt: String
 

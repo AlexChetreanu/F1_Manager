@@ -20,21 +20,13 @@ final class NewsService {
 
     /// Fetches F1 news from the backend.
     /// - Parameters:
-    ///   - year: Calendar year to retrieve news for. Defaults to the current year.
-    ///   - limit: Maximum number of items to request. Defaults to the number of days in the given year.
-    func fetchF1News(year: Int = Calendar.current.component(.year, from: Date()),
-                     limit: Int? = nil) async throws -> [NewsItem] {
-        let computedLimit: Int = {
-            if let limit { return limit }
-            let calendar = Calendar.current
-            let start = calendar.date(from: DateComponents(year: year))!
-            return calendar.range(of: .day, in: .year, for: start)!.count
-        }()
-
+    ///   - days: Number of days back to include.
+    ///   - limit: Maximum number of items to request.
+    func fetchF1News(days: Int = 30, limit: Int = 20) async throws -> [NewsItem] {
         var comps = URLComponents(url: baseURL.appendingPathComponent("api/news/f1"), resolvingAgainstBaseURL: false)!
         comps.queryItems = [
-            URLQueryItem(name: "year", value: String(year)),
-            URLQueryItem(name: "limit", value: String(computedLimit))
+            URLQueryItem(name: "days", value: String(days)),
+            URLQueryItem(name: "limit", value: String(limit))
         ]
         let (data, _) = try await session.data(from: comps.url!)
         return try decoder.decode([NewsItem].self, from: data)

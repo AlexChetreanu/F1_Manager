@@ -9,6 +9,14 @@ The mobile app reads its server address from `F1App/F1App/APIConfig.swift`.
 
 After updating the value, rebuild the app for the desired target.
 
+## F1 news API
+
+Quick check for available Autosport news:
+
+```bash
+curl -s 'http://127.0.0.1:8000/api/news/f1?days=30&limit=20' | jq 'length'
+```
+
 ## Historical playback API
 
 ### Backend
