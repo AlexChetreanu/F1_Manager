@@ -436,9 +436,11 @@ class HistoricalRaceViewModel: ObservableObject {
     private func updateRaceControlMessages() {
         guard !allRaceControlMessages.isEmpty else { return }
         guard let current = currentRaceDate() else { return }
+        let startOfMinute = Date(timeIntervalSinceReferenceDate: floor(current.timeIntervalSinceReferenceDate / 60) * 60)
+        let endOfMinute = startOfMinute.addingTimeInterval(60)
         raceControlMessages = allRaceControlMessages.filter { msg in
             if let dStr = msg.date, let d = dateFormatter.date(from: dStr) {
-                return d <= current
+                return d >= startOfMinute && d < endOfMinute
             }
             return false
         }
