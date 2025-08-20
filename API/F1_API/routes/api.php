@@ -10,6 +10,7 @@ use App\Http\Controllers\OpenF1Controller;
 use App\Http\Controllers\LiveController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HistoricalController;
+use App\Http\Controllers\NewsController;
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
@@ -43,4 +44,5 @@ Route::prefix('historical')->middleware('throttle:120,1')->group(function () {
     Route::get('/session/{session_key}/frames', [HistoricalController::class, 'frames']);
 });
 Route::get('/health', [HealthController::class, 'index']);
+Route::get('/news/f1', [NewsController::class, 'f1Autosport']);
 

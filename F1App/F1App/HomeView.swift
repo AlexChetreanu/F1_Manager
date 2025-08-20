@@ -8,14 +8,50 @@
 import SwiftUI
 
 struct HomeView: View {
+    @State private var news: [NewsItem] = []
+    @State private var isLoading = false
+    @State private var error: String?
+    private let service = NewsService()
+
     var body: some View {
         NavigationView {
-            VStack {
-                Text("Bine ai venit în aplicația F1!")
-                    .font(.title2)
-                    .padding()
+            List {
+                Section("Știri F1 (Autosport)") {
+                    if isLoading {
+                        ProgressView().frame(maxWidth: .infinity)
+                    } else if let error = error {
+                        VStack {
+                            Text(error)
+                                .multilineTextAlignment(.center)
+                            Button("Retry") { Task { await loadNews() } }
+                        }
+                        .frame(maxWidth: .infinity)
+                    } else if news.isEmpty {
+                        Text("Nicio știre disponibilă").frame(maxWidth: .infinity)
+                    } else {
+                        ForEach(news) { item in
+                            NavigationLink(destination: NewsDetailView(item: item)) {
+                                NewsCard(item: item)
+                            }
+                        }
+                    }
+                }
             }
+            .listStyle(.plain)
             .navigationTitle("Acasă")
+            .task { await loadNews() }
+            .refreshable { await loadNews() }
         }
+    }
+
+    private func loadNews() async {
+        isLoading = true
+        error = nil
+        do {
+            news = try await service.fetchF1News()
+        } catch {
+            self.error = "Eroare la încărcarea știrilor"
+        }
+        isLoading = false
     }
 }

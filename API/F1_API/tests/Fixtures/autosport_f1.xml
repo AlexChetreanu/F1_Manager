@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Autosport.com - Formula 1 - Stories</title>
+    <item>
+      <title>Second article</title>
+      <link>https://www.autosport.com/f1/news/second</link>
+      <description><![CDATA[<p>Second summary</p>]]></description>
+      <pubDate>Mon, 18 Aug 2025 12:00:00 +0000</pubDate>
+      <media:content url="https://example.com/second.jpg" type="image/jpeg" />
+    </item>
+    <item>
+      <title>First article</title>
+      <link>https://www.autosport.com/f1/news/first</link>
+      <description><![CDATA[First summary]]></description>
+      <pubDate>Wed, 20 Aug 2025 12:00:00 +0000</pubDate>
+      <enclosure url="https://example.com/first.jpg" type="image/jpeg" />
+    </item>
+    <item>
+      <title>Old article</title>
+      <link>https://www.autosport.com/f1/news/old</link>
+      <description><![CDATA[Old summary]]></description>
+      <pubDate>Fri, 01 Aug 2025 12:00:00 +0000</pubDate>
+    </item>
+  </channel>
+</rss>
