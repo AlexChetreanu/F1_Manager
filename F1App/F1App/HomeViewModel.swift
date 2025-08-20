@@ -16,8 +16,8 @@ final class HomeViewModel: ObservableObject {
         let limit = 20
         do {
             let fetched = try await service.fetchF1News(days: 30, limit: limit)
-            print("News count:", fetched.count)
             items = fetched
+            print("News count on screen:", items.count) // TODO: remove verbose logs before release
             if fetched.count < limit {
                 info = "Doar \(fetched.count) din \(limit) știri disponibile."
             }

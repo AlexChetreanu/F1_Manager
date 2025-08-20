@@ -23,7 +23,7 @@ final class NewsServiceTests: XCTestCase {
         config.protocolClasses = [URLProtocolStub.self]
         URLProtocolStub.responseData = "[{\"id\":\"1\",\"title\":\"t\",\"link\":\"l\",\"published_at\":\"2024-01-01T00:00:00Z\",\"image_url\":null,\"source\":\"s\",\"excerpt\":\"e\"}]".data(using: .utf8)!
         let session = URLSession(configuration: config)
-        let service = NewsService(baseURL: "https://example.com", session: session)
+        let service = NewsService(session: session, baseURL: URL(string: "https://example.com")!)
 
         _ = try await service.fetchF1News(days: 30, limit: 10)
 
