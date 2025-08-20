@@ -27,10 +27,12 @@ struct DriverDetailView: View {
                 Text("Position: \(viewModel.position)")
                 Text("RPM: \(viewModel.rpm)")
                 Text("Speed: \(viewModel.speed)")
+                Text("Gear: \(viewModel.gear)")
                 Text("Acceleration: \(viewModel.acceleration)")
                 Text("Brake: \(viewModel.brake)")
                 Text("DRS: \(viewModel.drs)")
                 Text("Number of laps: \(viewModel.numberOfLaps)")
+                Text("Status: \(viewModel.status)")
                 Text("DSQ: \(viewModel.dsq ? "Yes" : "No")")
 
             }
@@ -58,9 +60,11 @@ class DriverDetailViewModel: ObservableObject {
     @Published var acceleration: String = "-"
     @Published var brake: String = "-"
     @Published var drs: String = "-"
+    @Published var gear: String = "-"
     @Published var numberOfLaps: Int = 0
     @Published var dsq: Bool = false
     @Published var compound: String = "-"
+    @Published var status: String = "-"
 
     private let driverNumber: Int
     private let sessionKey: Int?
@@ -68,6 +72,9 @@ class DriverDetailViewModel: ObservableObject {
     init(driver: DriverInfo, sessionKey: Int?) {
         self.driverNumber = driver.driver_number
         self.sessionKey = sessionKey
+        if sessionKey != nil {
+            fetchStatus()
+        }
     }
 
     private struct TelemetryResponse: Decodable {
@@ -83,7 +90,16 @@ class DriverDetailViewModel: ObservableObject {
         let gap_to_leader: String?
         let position: Int?
         let lap_number: Int?
+        let n_gear: Int?
     }
+    private struct SessionResultResponse: Decodable {
+        let data: [SessionResult]
+    }
+
+    private struct SessionResult: Decodable {
+        let status: String?
+    }
+
 
     func fetchTelemetry(at timestamp: String) {
         guard let sessionKey = sessionKey else { return }
@@ -140,6 +156,7 @@ class DriverDetailViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     if let rpm = telem.rpm { self.rpm = String(Int(rpm)) }
                     if let speed = telem.speed { self.speed = String(format: "%.1f", speed) }
+                    if let gear = telem.n_gear { self.gear = String(gear) }
                     if let throttle = telem.throttle { self.acceleration = String(format: "%.1f", throttle) }
                     if let brake = telem.brake { self.brake = String(format: "%.1f", brake) }
                     if let drs = telem.drs_status { self.drs = drs == 1 ? "On" : "Off" }
@@ -149,6 +166,33 @@ class DriverDetailViewModel: ObservableObject {
                 }
             } catch {
                 print("Telemetry decode error: \(error.localizedDescription)")
+            }
+        }.resume()
+    }
+
+    func fetchStatus() {
+        guard let sessionKey = sessionKey else { return }
+        var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/session_result")!
+        comps.queryItems = [
+            URLQueryItem(name: "session_key", value: String(sessionKey)),
+            URLQueryItem(name: "driver_number", value: String(driverNumber)),
+            URLQueryItem(name: "limit", value: "1")
+        ]
+        guard let url = comps.url else { return }
+
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            guard let data = data,
+                  let response = try? JSONDecoder().decode(SessionResultResponse.self, from: data),
+                  let statusText = response.data.first?.status else { return }
+            DispatchQueue.main.async {
+                let upper = statusText.uppercased()
+                if upper.contains("DNF") {
+                    self.status = "DNF"
+                } else if upper.contains("DNS") {
+                    self.status = "DNS"
+                } else {
+                    self.status = statusText
+                }
             }
         }.resume()
     }
