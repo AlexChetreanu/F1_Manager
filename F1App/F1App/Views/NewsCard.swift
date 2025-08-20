@@ -5,7 +5,7 @@ struct NewsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let urlString = item.imageUrl, let url = URL(string: urlString) {
+            if let url = item.imageUrl {
                 AsyncImage(url: url) { image in
                     image.resizable()
                         .aspectRatio(16/9, contentMode: .fill)

@@ -25,11 +25,11 @@ final class NewsServiceTests: XCTestCase {
         let session = URLSession(configuration: config)
         let service = NewsService(baseURL: "https://example.com", session: session)
 
-        _ = try await service.fetchF1News(year: 2024, limit: 10)
+        _ = try await service.fetchF1News(days: 30, limit: 10)
 
         let components = URLComponents(url: URLProtocolStub.lastRequest!.url!, resolvingAgainstBaseURL: false)
         XCTAssertEqual(components?.path, "/api/news/f1")
-        XCTAssertTrue(components?.queryItems?.contains(URLQueryItem(name: "year", value: "2024")) ?? false)
+        XCTAssertTrue(components?.queryItems?.contains(URLQueryItem(name: "days", value: "30")) ?? false)
         XCTAssertTrue(components?.queryItems?.contains(URLQueryItem(name: "limit", value: "10")) ?? false)
     }
 }

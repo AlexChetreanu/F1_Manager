@@ -7,7 +7,7 @@ struct NewsDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                if let urlString = item.imageUrl, let url = URL(string: urlString) {
+                if let url = item.imageUrl {
                     AsyncImage(url: url) { image in
                         image.resizable().aspectRatio(contentMode: .fit)
                     } placeholder: {

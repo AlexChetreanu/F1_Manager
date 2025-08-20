@@ -8,34 +8,30 @@
 import SwiftUI
 
 struct HomeView: View {
-    @State private var news: [NewsItem] = []
-    @State private var isLoading = false
-    @State private var error: String?
-    @State private var info: String?
-    private let service = NewsService()
+    @StateObject private var viewModel = HomeViewModel()
 
     var body: some View {
         NavigationView {
             List {
                 Section("Știri F1 (Autosport)") {
-                    if isLoading {
+                    if viewModel.isLoading {
                         ProgressView().frame(maxWidth: .infinity)
-                    } else if let error = error {
+                    } else if let error = viewModel.error {
                         VStack {
                             Text(error)
                                 .multilineTextAlignment(.center)
-                            Button("Retry") { Task { await loadNews() } }
+                            Button("Retry") { Task { await viewModel.load() } }
                         }
                         .frame(maxWidth: .infinity)
-                    } else if news.isEmpty {
+                    } else if viewModel.items.isEmpty {
                         Text("Nicio știre disponibilă").frame(maxWidth: .infinity)
                     } else {
-                        ForEach(news) { item in
+                        ForEach(viewModel.items, id: \.id) { item in
                             NavigationLink(destination: NewsDetailView(item: item)) {
                                 NewsCard(item: item)
                             }
                         }
-                        if let info = info {
+                        if let info = viewModel.info {
                             Text(info)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -46,29 +42,8 @@ struct HomeView: View {
             }
             .listStyle(.plain)
             .navigationTitle("Acasă")
-            .task { await loadNews() }
-            .refreshable { await loadNews() }
+            .task { await viewModel.load() }
+            .refreshable { await viewModel.load() }
         }
-    }
-
-    /// Loads latest F1 news for the current season.
-    @MainActor
-    private func loadNews() async {
-        isLoading = true
-        error = nil
-        info = nil
-
-        let currentYear = Calendar.current.component(.year, from: Date())
-        let limit = 30
-
-        do {
-            news = try await service.fetchF1News(year: currentYear, limit: limit)
-            if news.count < limit {
-                info = "Doar \(news.count) din \(limit) știri disponibile pentru sezonul \(currentYear)."
-            }
-        } catch {
-            self.error = "Eroare la încărcarea știrilor"
-        }
-        isLoading = false
     }
 }
