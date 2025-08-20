@@ -37,3 +37,11 @@ points to the backend server (see above). The client uses the new
 control buffering and playback.
 
 Run unit tests with `swift test` or the Xcode test action.
+
+## News fetching
+
+The home screen shows the latest Autosport F1 headlines via the backend endpoint
+`/api/news/f1`. The client requests articles for the current calendar year and a
+large limit (365) to cover an entire season. If the upstream RSS feed exposes
+fewer items, a warning is displayed to inform the user that only the available
+subset could be loaded.

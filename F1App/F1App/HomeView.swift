@@ -11,6 +11,7 @@ struct HomeView: View {
     @State private var news: [NewsItem] = []
     @State private var isLoading = false
     @State private var error: String?
+    @State private var warning: String?
     private let service = NewsService()
 
     var body: some View {
@@ -29,6 +30,13 @@ struct HomeView: View {
                     } else if news.isEmpty {
                         Text("Nicio știre disponibilă").frame(maxWidth: .infinity)
                     } else {
+                        if let warning = warning {
+                            Text(warning)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .padding(.bottom, 4)
+                                .frame(maxWidth: .infinity)
+                        }
                         ForEach(news) { item in
                             NavigationLink(destination: NewsDetailView(item: item)) {
                                 NewsCard(item: item)
@@ -44,11 +52,18 @@ struct HomeView: View {
         }
     }
 
+    @MainActor
     private func loadNews() async {
         isLoading = true
         error = nil
+        warning = nil
         do {
-            news = try await service.fetchF1News()
+            let currentYear = Calendar.current.component(.year, from: Date())
+            let limit = 365
+            news = try await service.fetchF1News(year: currentYear, limit: limit)
+            if news.count < limit {
+                warning = "Doar \(news.count) știri disponibile pentru \(currentYear)."
+            }
         } catch {
             self.error = "Eroare la încărcarea știrilor"
         }

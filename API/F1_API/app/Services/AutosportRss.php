@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use GuzzleHttp\Client;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class AutosportRss
 {
@@ -23,6 +24,11 @@ class AutosportRss
      * Fetch and parse Autosport F1 news RSS feed.
      *
      * @return array<int, array<string, mixed>>
+     */
+    /**
+     * Fetch and cache Autosport F1 news, persisting yearly archives to disk so
+     * past articles remain accessible even after they disappear from the live
+     * RSS feed.
      */
     public function fetch(int $days = 30, int $limit = 20, ?int $year = null): array
     {
@@ -42,7 +48,7 @@ class AutosportRss
                 $end = Carbon::now();
             }
 
-            $items = collect(iterator_to_array($xml->channel->item ?? []))->map(function ($item) {
+            $items = collect(iterator_to_array($xml->channel->item ?? [], false))->map(function ($item) {
                 $link = (string) $item->link;
                 $image = null;
                 $media = $item->children('media', true);
@@ -66,9 +72,27 @@ class AutosportRss
             })->filter(function ($item) use ($start, $end) {
                 $published = Carbon::parse($item['published_at']);
                 return $published->betweenIncluded($start, $end);
-            })->sortByDesc('published_at')->take($limit)->values()->all();
+            });
 
-            return $items;
+            if ($year && !app()->runningUnitTests()) {
+                $file = "autosport_f1_news_{$year}.json";
+                $stored = [];
+                if (Storage::exists($file)) {
+                    $stored = json_decode(Storage::get($file), true) ?: [];
+                }
+                $merged = collect($stored)
+                    ->keyBy('id')
+                    ->merge($items->keyBy('id'))
+                    ->filter(function ($item) use ($start, $end) {
+                        $published = Carbon::parse($item['published_at']);
+                        return $published->betweenIncluded($start, $end);
+                    })
+                    ->values();
+                Storage::put($file, json_encode($merged->all()));
+                return $merged->sortByDesc('published_at')->take($limit)->values()->all();
+            }
+
+            return $items->sortByDesc('published_at')->take($limit)->values()->all();
         });
     }
 }
