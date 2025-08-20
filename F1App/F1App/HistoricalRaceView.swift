@@ -6,7 +6,6 @@ struct HistoricalRaceView: View {
     @State private var showDebug = false
     struct DriverSelection: Identifiable {
         let driver: DriverInfo
-        let point: LocationPoint
         var id: Int { driver.driver_number }
     }
 
@@ -64,7 +63,7 @@ struct HistoricalRaceView: View {
                                             .frame(width: 8, height: 8)
                                             .position(point)
                                             .onTapGesture {
-                                                selectedDriver = DriverSelection(driver: driver, point: loc)
+                                                selectedDriver = DriverSelection(driver: driver)
                                             }
                                         Text(driver.initials)
                                             .font(.caption2)
@@ -152,7 +151,7 @@ struct HistoricalRaceView: View {
         .sheet(item: $selectedDriver) { selection in
             DriverDetailView(driver: selection.driver,
                              sessionKey: viewModel.sessionKey,
-                             location: selection.point)
+                             raceViewModel: viewModel)
         }
     }
 }
