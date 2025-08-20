@@ -91,12 +91,14 @@ class DriverDetailViewModel: ObservableObject {
         let lap_number: Int?
         let n_gear: Int?
     }
-    private struct OvertakesResponse: Decodable {
-        let data: [Overtake]
+    private struct PositionResponse: Decodable {
+        let data: [PositionEntry]
     }
 
-    private struct Overtake: Decodable {
+    private struct PositionEntry: Decodable {
         let position: Int?
+        let driver_number: Int?
+        let date: String?
     }
     private struct SessionResultResponse: Decodable {
         let data: [SessionResult]
@@ -110,7 +112,7 @@ class DriverDetailViewModel: ObservableObject {
     func fetchTelemetry(at timestamp: String) {
         guard let sessionKey = sessionKey else { return }
 
-        // fetch live position from overtakes endpoint
+        // fetch live position from position endpoint
         fetchPosition(at: timestamp)
 
         let formatter = ISO8601DateFormatter()
@@ -181,7 +183,7 @@ class DriverDetailViewModel: ObservableObject {
     private func fetchPosition(at timestamp: String) {
         guard let sessionKey = sessionKey else { return }
 
-        var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/overtakes")!
+        var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/position")!
         comps.queryItems = [
             URLQueryItem(name: "session_key", value: String(sessionKey)),
             URLQueryItem(name: "driver_number", value: String(driverNumber)),
@@ -205,9 +207,11 @@ class DriverDetailViewModel: ObservableObject {
                 return
             }
             do {
-                let resp = try JSONDecoder().decode(OvertakesResponse.self, from: data)
+                let resp = try JSONDecoder().decode(PositionResponse.self, from: data)
                 if let pos = resp.data.first?.position {
                     DispatchQueue.main.async { self.position = String(pos) }
+                } else {
+                    DispatchQueue.main.async { self.position = "-" }
                 }
             } catch {
                 print("Position decode error: \(error.localizedDescription)")
