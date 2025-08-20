@@ -48,7 +48,8 @@ struct HomeView: View {
         isLoading = true
         error = nil
         do {
-            news = try await service.fetchF1News()
+            // Fetch all available news for the 2025 season
+            news = try await service.fetchF1News(year: 2025, limit: 365)
         } catch {
             self.error = "Eroare la încărcarea știrilor"
         }
