@@ -9,9 +9,10 @@ import SwiftUI
 
 struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
+    @State private var selectedItem: NewsItem?
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             List {
                 Section("Știri F1 (Autosport)") {
                     if viewModel.isLoading {
@@ -27,9 +28,9 @@ struct HomeView: View {
                         Text("Nicio știre disponibilă").frame(maxWidth: .infinity)
                     } else {
                         ForEach(viewModel.items, id: \.id) { item in
-                            NavigationLink(destination: NewsDetailView(item: item)) {
-                                NewsCard(item: item)
-                            }
+                            NewsCard(item: item)
+                                .contentShape(Rectangle())
+                                .onTapGesture { selectedItem = item }
                         }
                         if let info = viewModel.info {
                             Text(info)
@@ -44,6 +45,9 @@ struct HomeView: View {
             .navigationTitle("Acasă")
             .task { await viewModel.load() }
             .refreshable { await viewModel.load() }
+            .navigationDestination(item: $selectedItem) { item in
+                NewsDetailView(item: item)
+            }
         }
     }
 }
