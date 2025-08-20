@@ -95,9 +95,14 @@ struct CircuitView: View {
                 .background(Color.gray.opacity(0.1))
                 .cornerRadius(8)
                 .sheet(item: $selectedDriver) { selection in
-                    DriverDetailView(driver: selection.driver,
-                                     sessionKey: viewModel.sessionKey,
-                                     location: selection.point)
+                    if let sk = viewModel.sessionKey {
+                        DriverDetailView(
+                            driver: selection.driver,
+                            sessionKey: sk,
+                            raceViewModel: viewModel
+                        )
+                    }
+
                 }
             }
         }
