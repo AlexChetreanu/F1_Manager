@@ -91,6 +91,20 @@ struct HistoricalRaceView: View {
                         .padding(.bottom)
                 }
 
+                if !viewModel.raceControlMessages.isEmpty {
+                    List(viewModel.raceControlMessages) { msg in
+                        HStack(alignment: .top) {
+                            if let lap = msg.lapNumber {
+                                Text("Tur \(lap)")
+                                    .bold()
+                            }
+                            Text(msg.message ?? "")
+                                .font(.caption)
+                        }
+                    }
+                    .frame(maxHeight: 200)
+                }
+
                 if viewModel.maxSteps > 1 {
                     Slider(
                         value: Binding(
@@ -118,18 +132,6 @@ struct HistoricalRaceView: View {
                     }
                 }
                 .padding(.bottom)
-
-                if !viewModel.raceControlMessages.isEmpty {
-                    List(viewModel.raceControlMessages) { msg in
-                        VStack(alignment: .leading) {
-                            ForEach(msg.details.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
-                                Text("\(key): \(value)")
-                                    .font(.caption)
-                            }
-                        }
-                    }
-                    .frame(maxHeight: 200)
-                }
             }
             Spacer()
         }
