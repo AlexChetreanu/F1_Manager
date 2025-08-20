@@ -11,6 +11,7 @@ struct HomeView: View {
     @State private var news: [NewsItem] = []
     @State private var isLoading = false
     @State private var error: String?
+    @State private var info: String?
     private let service = NewsService()
 
     var body: some View {
@@ -34,6 +35,12 @@ struct HomeView: View {
                                 NewsCard(item: item)
                             }
                         }
+                        if let info = info {
+                            Text(info)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity)
+                        }
                     }
                 }
             }
@@ -44,12 +51,22 @@ struct HomeView: View {
         }
     }
 
+    /// Loads latest F1 news for the current season.
+    @MainActor
     private func loadNews() async {
         isLoading = true
         error = nil
+        info = nil
+
+        let currentYear = Calendar.current.component(.year, from: Date())
+        let yearStart = Calendar.current.date(from: DateComponents(year: currentYear))!
+        let expectedCount = Calendar.current.range(of: .day, in: .year, for: yearStart)!.count
+
         do {
-            // Fetch all available news for the 2025 season
-            news = try await service.fetchF1News(year: 2025, limit: 365)
+            news = try await service.fetchF1News(year: currentYear, limit: expectedCount)
+            if news.count < expectedCount {
+                info = "Doar \(news.count) știri disponibile pentru sezonul \(currentYear)."
+            }
         } catch {
             self.error = "Eroare la încărcarea știrilor"
         }
