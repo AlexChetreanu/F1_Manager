@@ -11,7 +11,7 @@ final class NewsService {
         self.decoder = d
     }
 
-    func fetchF1News(year: Int = 2025, limit: Int = 20) async throws -> [NewsItem] {
+    func fetchF1News(year: Int = 2025, limit: Int = 365) async throws -> [NewsItem] {
         var comps = URLComponents(url: baseURL.appendingPathComponent("api/news/f1"), resolvingAgainstBaseURL: false)!
         comps.queryItems = [
             URLQueryItem(name: "year", value: String(year)),
