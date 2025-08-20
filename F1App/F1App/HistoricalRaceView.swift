@@ -68,6 +68,15 @@ struct HistoricalRaceView: View {
                                         Text(driver.initials)
                                             .font(.caption2)
                                             .position(x: point.x, y: point.y - 10)
+                                        if let leader = viewModel.drivers.first,
+                                           leader.driver_number == driver.driver_number,
+                                           let line = perpendicularLine(at: point, size: geo.size) {
+                                            Path { path in
+                                                path.move(to: line.start)
+                                                path.addLine(to: line.end)
+                                            }
+                                            .stroke(Color.primary, lineWidth: 1)
+                                        }
                                     }
                                 }
                             }
@@ -155,5 +164,40 @@ struct HistoricalRaceView: View {
                              sessionKey: viewModel.sessionKey,
                              raceViewModel: viewModel)
         }
+    }
+
+    private func perpendicularLine(at point: CGPoint, size: CGSize) -> (start: CGPoint, end: CGPoint)? {
+        let pts = viewModel.trackPoints.map { CGPoint(x: $0.x * size.width, y: $0.y * size.height) }
+        guard pts.count > 1 else { return nil }
+        var nearestIndex = 0
+        var minDist = CGFloat.greatestFiniteMagnitude
+        for i in 0..<(pts.count - 1) {
+            let p0 = pts[i]
+            let p1 = pts[i + 1]
+            let segVec = CGPoint(x: p1.x - p0.x, y: p1.y - p0.y)
+            let segLen2 = segVec.x * segVec.x + segVec.y * segVec.y
+            if segLen2 == 0 { continue }
+            let t = max(0, min(1, ((point.x - p0.x) * segVec.x + (point.y - p0.y) * segVec.y) / segLen2))
+            let proj = CGPoint(x: p0.x + segVec.x * t, y: p0.y + segVec.y * t)
+            let dx = point.x - proj.x
+            let dy = point.y - proj.y
+            let dist2 = dx * dx + dy * dy
+            if dist2 < minDist {
+                minDist = dist2
+                nearestIndex = i
+            }
+        }
+        let p0 = pts[nearestIndex]
+        let p1 = pts[(nearestIndex + 1) % pts.count]
+        let tangent = CGPoint(x: p1.x - p0.x, y: p1.y - p0.y)
+        let len = sqrt(tangent.x * tangent.x + tangent.y * tangent.y)
+        if len == 0 { return nil }
+        let normal = CGPoint(x: -tangent.y / len, y: tangent.x / len)
+        // The circle has an 8pt diameter; draw a short 16pt line (double the circle)
+        let lineLength: CGFloat = 16
+        let half = lineLength / 2
+        let start = CGPoint(x: point.x - normal.x * half, y: point.y - normal.y * half)
+        let end = CGPoint(x: point.x + normal.x * half, y: point.y + normal.y * half)
+        return (start, end)
     }
 }
