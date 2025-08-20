@@ -1,18 +1,18 @@
 import SwiftUI
+import Combine
 
 struct DriverDetailView: View {
     let driver: DriverInfo
     let sessionKey: Int?
-    let location: LocationPoint
+    @ObservedObject var raceViewModel: HistoricalRaceViewModel
     @StateObject private var viewModel: DriverDetailViewModel
 
-    init(driver: DriverInfo, sessionKey: Int?, location: LocationPoint) {
+    init(driver: DriverInfo, sessionKey: Int?, raceViewModel: HistoricalRaceViewModel) {
         self.driver = driver
         self.sessionKey = sessionKey
-        self.location = location
+        self.raceViewModel = raceViewModel
         _viewModel = StateObject(wrappedValue: DriverDetailViewModel(driver: driver,
-                                                                    sessionKey: sessionKey,
-                                                                    timestamp: location.date))
+                                                                    sessionKey: sessionKey))
     }
 
     var body: some View {
@@ -37,6 +37,16 @@ struct DriverDetailView: View {
             .padding()
         }
         .navigationTitle(driver.initials)
+        .onAppear { updateTelemetry() }
+        .onReceive(raceViewModel.$stepIndex) { _ in
+            updateTelemetry()
+        }
+    }
+
+    private func updateTelemetry() {
+        if let timestamp = raceViewModel.currentPosition[driver.driver_number]?.date {
+            viewModel.fetchTelemetry(at: timestamp)
+        }
     }
 }
 
@@ -55,10 +65,9 @@ class DriverDetailViewModel: ObservableObject {
     private let driverNumber: Int
     private let sessionKey: Int?
 
-    init(driver: DriverInfo, sessionKey: Int?, timestamp: String) {
+    init(driver: DriverInfo, sessionKey: Int?) {
         self.driverNumber = driver.driver_number
         self.sessionKey = sessionKey
-        fetchTelemetry(at: timestamp)
     }
 
     private struct TelemetryResponse: Decodable {
