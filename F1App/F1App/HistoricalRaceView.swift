@@ -120,16 +120,11 @@ struct HistoricalRaceView: View {
                 .padding(.bottom)
 
                 if !viewModel.raceControlMessages.isEmpty {
-                    ScrollView {
-                        LazyVStack(alignment: .leading) {
-                            ForEach(viewModel.raceControlMessages) { msg in
-                                VStack(alignment: .leading) {
-                                    ForEach(msg.details.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
-                                        Text("\(key): \(value)")
-                                            .font(.caption)
-                                    }
-                                }
-                                .padding(.vertical, 2)
+                    List(viewModel.raceControlMessages) { msg in
+                        VStack(alignment: .leading) {
+                            ForEach(msg.details.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
+                                Text("\(key): \(value)")
+                                    .font(.caption)
                             }
                         }
                     }
