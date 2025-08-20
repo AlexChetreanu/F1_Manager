@@ -4,7 +4,16 @@ final class NewsService {
     let session: URLSession
     let baseURL: URL
 
-    init(session: URLSession = .shared, baseURL: URL = URL(string: APIConfig.baseURL)!) {
+    static let cachedSession: URLSession = {
+        let cfg = URLSessionConfiguration.default
+        cfg.urlCache = URLCache(memoryCapacity: 20*1024*1024,
+                                diskCapacity: 100*1024*1024,
+                                diskPath: "f1app_cache")
+        cfg.requestCachePolicy = .returnCacheDataElseLoad
+        return URLSession(configuration: cfg)
+    }()
+
+    init(session: URLSession = NewsService.cachedSession, baseURL: URL = URL(string: APIConfig.baseURL)!) {
         self.session = session
         self.baseURL = baseURL
     }
