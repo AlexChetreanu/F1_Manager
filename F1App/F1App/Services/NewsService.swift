@@ -11,10 +11,10 @@ final class NewsService {
         self.decoder = d
     }
 
-    func fetchF1News(days: Int = 30, limit: Int = 20) async throws -> [NewsItem] {
+    func fetchF1News(year: Int = 2025, limit: Int = 20) async throws -> [NewsItem] {
         var comps = URLComponents(url: baseURL.appendingPathComponent("api/news/f1"), resolvingAgainstBaseURL: false)!
         comps.queryItems = [
-            URLQueryItem(name: "days", value: String(days)),
+            URLQueryItem(name: "year", value: String(year)),
             URLQueryItem(name: "limit", value: String(limit))
         ]
         let (data, _) = try await URLSession.shared.data(from: comps.url!)

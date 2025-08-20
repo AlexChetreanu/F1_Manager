@@ -11,8 +11,9 @@ class NewsController extends Controller
     {
         $days = (int) $request->query('days', 30);
         $limit = (int) $request->query('limit', 20);
+        $year = $request->query('year');
 
-        $items = $rss->fetch($days, $limit);
+        $items = $rss->fetch($days, $limit, $year ? (int) $year : null);
 
         return response()->json($items);
     }

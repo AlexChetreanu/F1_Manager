@@ -23,7 +23,7 @@ it('returns filtered and sorted news items', function () {
     });
 
     $controller = new NewsController();
-    $request = Request::create('/api/news/f1', 'GET', ['days' => 5, 'limit' => 5]);
+    $request = Request::create('/api/news/f1', 'GET', ['year' => 2025, 'limit' => 2]);
     $response = $controller->f1Autosport($request, $service);
 
     $data = $response->getData(true);
