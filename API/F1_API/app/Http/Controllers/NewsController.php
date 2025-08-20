@@ -20,22 +20,7 @@ class NewsController extends Controller
 
         $items = $rss->fetch($days, $limit, $yearInt, $nocache);
 
-        $etag = '"' . md5(json_encode($items)) . '"';
-        $ifNoneMatch = $request->headers->get('If-None-Match');
-        $maxAge = 300; // 5 min
-
-        if ($ifNoneMatch === $etag && !$nocache) {
-            Log::info('news.f1 not_modified');
-            return response('', 304)
-                ->header('ETag', $etag)
-                ->header('Cache-Control', "public, max-age={$maxAge}")
-                ->header('Vary', 'Accept');
-        }
-
         Log::info('news.f1 final_count', ['count'=>count($items)]);
-        return response()->json($items, 200, [], JSON_UNESCAPED_UNICODE)
-            ->header('ETag', $etag)
-            ->header('Cache-Control', "public, max-age={$maxAge}")
-            ->header('Vary', 'Accept');
+        return response()->json($items, 200, [], JSON_UNESCAPED_UNICODE);
     }
 }
