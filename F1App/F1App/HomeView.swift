@@ -59,13 +59,12 @@ struct HomeView: View {
         info = nil
 
         let currentYear = Calendar.current.component(.year, from: Date())
-        let yearStart = Calendar.current.date(from: DateComponents(year: currentYear))!
-        let expectedCount = Calendar.current.range(of: .day, in: .year, for: yearStart)!.count
+        let limit = 30
 
         do {
-            news = try await service.fetchF1News(year: currentYear, limit: expectedCount)
-            if news.count < expectedCount {
-                info = "Doar \(news.count) știri disponibile pentru sezonul \(currentYear)."
+            news = try await service.fetchF1News(year: currentYear, limit: limit)
+            if news.count < limit {
+                info = "Doar \(news.count) din \(limit) știri disponibile pentru sezonul \(currentYear)."
             }
         } catch {
             self.error = "Eroare la încărcarea știrilor"
