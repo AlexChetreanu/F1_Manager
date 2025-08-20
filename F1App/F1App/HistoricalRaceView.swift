@@ -91,6 +91,13 @@ struct HistoricalRaceView: View {
                         .padding(.bottom)
                 }
 
+                if let overtake = viewModel.overtakeMessage {
+                    Text(overtake)
+                        .padding(8)
+                        .background(Color.yellow.opacity(0.2))
+                        .cornerRadius(8)
+                }
+
                 if !viewModel.raceControlMessages.isEmpty {
                     List(viewModel.raceControlMessages) { msg in
                         HStack(alignment: .top) {

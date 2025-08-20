@@ -67,6 +67,44 @@ struct RaceControlMessage: Identifiable, Decodable {
     }
 }
 
+struct OvertakeEvent: Identifiable, Decodable {
+    let id = UUID()
+    let details: [String: String]
+
+    var date: String? { details["date"] }
+    var overtakingDriverNumber: Int? { details["overtaking_driver_number"].flatMap { Int($0) } }
+    var overtakenDriverNumber: Int? { details["overtaken_driver_number"].flatMap { Int($0) } }
+
+    struct DynamicCodingKeys: CodingKey {
+        var stringValue: String
+        init?(stringValue: String) { self.stringValue = stringValue }
+        var intValue: Int?
+        init?(intValue: Int) {
+            self.intValue = intValue
+            self.stringValue = "\(intValue)"
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DynamicCodingKeys.self)
+        var temp: [String: String] = [:]
+        for key in container.allKeys {
+            if let v = try? container.decode(String.self, forKey: key) {
+                temp[key.stringValue] = v
+            } else if let v = try? container.decode(Int.self, forKey: key) {
+                temp[key.stringValue] = String(v)
+            } else if let v = try? container.decode(Double.self, forKey: key) {
+                temp[key.stringValue] = String(v)
+            } else if let v = try? container.decode(Bool.self, forKey: key) {
+                temp[key.stringValue] = String(v)
+            } else if (try? container.decodeNil(forKey: key)) == true {
+                temp[key.stringValue] = "null"
+            }
+        }
+        details = temp
+    }
+}
+
 class HistoricalRaceViewModel: ObservableObject {
     @Published var year: String = ""
     @Published var errorMessage: String?
@@ -84,7 +122,10 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var debugEnabled = true
     @Published var diagnosisSummary: String?
     @Published var raceControlMessages: [RaceControlMessage] = []
+    @Published var overtakeMessage: String?
     private var allRaceControlMessages: [RaceControlMessage] = []
+    private var allOvertakes: [OvertakeEvent] = []
+    private var nextOvertakeIndex = 0
     let logger = DebugLogger()
     private var timer: Timer?
     private let speedOptions: [Double] = [1, 2, 5]
@@ -116,7 +157,10 @@ class HistoricalRaceViewModel: ObservableObject {
         positions.removeAll()
         currentPosition.removeAll()
         raceControlMessages.removeAll()
+        overtakeMessage = nil
         allRaceControlMessages.removeAll()
+        allOvertakes.removeAll()
+        nextOvertakeIndex = 0
         parseTrack(race.coordinates)
 
         guard let yearInt = Int(year) else {
@@ -196,6 +240,7 @@ class HistoricalRaceViewModel: ObservableObject {
                 self.errorMessage = nil
                 self.fetchDrivers(sessionKey: session.session_key)
                 self.fetchRaceControl(sessionKey: session.session_key)
+                self.fetchOvertakes(sessionKey: session.session_key)
             }
         }.resume()
     }
@@ -210,6 +255,10 @@ class HistoricalRaceViewModel: ObservableObject {
 
     private struct RaceControlResponse: Decodable {
         let data: [RaceControlMessage]
+    }
+
+    private struct OvertakesResponse: Decodable {
+        let data: [OvertakeEvent]
     }
 
     private func fetchDrivers(sessionKey: Int) {
@@ -260,6 +309,34 @@ class HistoricalRaceViewModel: ObservableObject {
                 }
             } catch {
                 self.log("decode /race_control", error.localizedDescription)
+            }
+        }.resume()
+    }
+
+    private func fetchOvertakes(sessionKey: Int) {
+        var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/overtakes")!
+        comps.queryItems = [URLQueryItem(name: "session_key", value: String(sessionKey))]
+        guard let url = comps.url else { return }
+        URLSession.shared.dataTask(with: url) { data, resp, error in
+            self.log("GET /openf1/overtakes", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+            if let error = error {
+                DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /overtakes: \(error.localizedDescription)" }
+                return
+            }
+            guard let data = data else { return }
+            do {
+                let response = try JSONDecoder().decode(OvertakesResponse.self, from: data)
+                let sorted = response.data.sorted {
+                    guard let d1 = self.dateFormatter.date(from: $0.date ?? ""),
+                          let d2 = self.dateFormatter.date(from: $1.date ?? "") else { return false }
+                    return d1 < d2
+                }
+                DispatchQueue.main.async {
+                    self.allOvertakes = sorted
+                    self.nextOvertakeIndex = 0
+                }
+            } catch {
+                self.log("decode /overtakes", error.localizedDescription)
             }
         }.resume()
     }
@@ -422,6 +499,7 @@ class HistoricalRaceViewModel: ObservableObject {
             }
         }
         updateRaceControlMessages()
+        updateOvertakes()
     }
 
     private func currentRaceDate() -> Date? {
@@ -443,6 +521,31 @@ class HistoricalRaceViewModel: ObservableObject {
                 return d >= startOfMinute && d < endOfMinute
             }
             return false
+        }
+    }
+
+    private func updateOvertakes() {
+        guard nextOvertakeIndex < allOvertakes.count else { return }
+        guard let current = currentRaceDate() else { return }
+        while nextOvertakeIndex < allOvertakes.count {
+            let evt = allOvertakes[nextOvertakeIndex]
+            guard let dStr = evt.date, let d = dateFormatter.date(from: dStr) else {
+                nextOvertakeIndex += 1
+                continue
+            }
+            if d <= current {
+                let overtaker = drivers.first { $0.driver_number == evt.overtakingDriverNumber }?.full_name ?? "?"
+                let overtaken = drivers.first { $0.driver_number == evt.overtakenDriverNumber }?.full_name ?? "?"
+                overtakeMessage = "\(overtaker) a depășit pe \(overtaken)"
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                    if self.overtakeMessage == "\(overtaker) a depășit pe \(overtaken)" {
+                        self.overtakeMessage = nil
+                    }
+                }
+                nextOvertakeIndex += 1
+            } else {
+                break
+            }
         }
     }
 
