@@ -4,65 +4,28 @@ namespace App\Http\Controllers;
 
 use App\Services\AutosportRss;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class NewsController extends Controller
 {
-    public function f1Autosport(Request $r, AutosportRss $rss)
+    public function f1Autosport(Request $request, AutosportRss $rss)
     {
-        $days  = (int) $r->integer('days', 30);
-        $limit = max(1, (int) $r->integer('limit', 20));
-        $cacheKey = "autosport_f1_{$days}_{$limit}";
+        $days  = (int) $request->query('days', 30);
+        $limit = (int) $request->query('limit', 20);
+        $year  = $request->query('year');
 
-        return Cache::remember($cacheKey, 3600, function () use ($rss, $days, $limit) {
-            $items = collect($rss->fetch());
-            $raw = $items->count();
-            $cutoff = now()->subDays($days);
+        // Clamping defensiv
+        $days  = $days > 0 ? min($days, 365) : 30;
+        $limit = $limit > 0 ? min($limit, 50) : 20;
+        $year  = $year !== null ? (int) $year : null;
 
-            $items = $items->filter(fn($it) =>
-                !empty($it['title']) &&
-                !empty($it['link']) &&
-                !empty($it['published_at']) &&
-                \Carbon\Carbon::parse($it['published_at'])->gte($cutoff)
-            )->sortByDesc('published_at');
+        Log::info('news.f1 params', ['days' => $days, 'limit' => $limit, 'year' => $year]); // TODO: remove verbose logs before release
 
-            $final = $items->take($limit)->values()->all();
+        $items = $rss->fetch($days, $limit, $year);
 
-            \Log::info('news.f1_autosport', [
-                'raw_count' => $raw,
-                'filtered_count_time' => $items->count(),
-                'final_count' => count($final),
-                'days' => $days,
-                'limit' => $limit,
-            ]);
+        Log::info('news.f1 final_count', ['count' => count($items)]); // TODO: remove verbose logs before release
 
-            return $final;
-        });
+        return response()->json($items, 200, [], JSON_UNESCAPED_UNICODE);
     }
 
-    public function debug(Request $r, AutosportRss $rss)
-    {
-        // TODO: remove before release
-        $days  = (int) $r->integer('days', 30);
-        $limit = max(1, (int) $r->integer('limit', 20));
-        $items = collect($rss->fetch());
-        $raw = $items->count();
-        $cutoff = now()->subDays($days);
-
-        $items = $items->filter(fn($it) =>
-            !empty($it['title']) &&
-            !empty($it['link']) &&
-            !empty($it['published_at']) &&
-            \Carbon\Carbon::parse($it['published_at'])->gte($cutoff)
-        )->sortByDesc('published_at');
-
-        $final = $items->take($limit)->values()->all();
-
-        return [
-            'raw_count' => $raw,
-            'filtered_count_time' => $items->count(),
-            'final_count' => count($final),
-            'sample_titles' => collect($final)->pluck('title')->take(5),
-        ];
-    }
 }

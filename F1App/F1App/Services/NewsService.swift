@@ -1,34 +1,37 @@
 import Foundation
 
-/// Service responsible for fetching F1 related news.
-///
-/// The server allows filtering by year and limiting the number of items.
-/// By default the current calendar year is requested and the limit is set to
-/// the number of days in that year to cover an entire season.
 final class NewsService {
-    private let baseURL: URL
-    private let decoder: JSONDecoder
-    private let session: URLSession
+    let session: URLSession
+    let baseURL: URL
 
-    init(baseURL: String = APIConfig.baseURL, session: URLSession = .shared) {
-        self.baseURL = URL(string: baseURL)!
-        let d = JSONDecoder()
-        d.dateDecodingStrategy = .iso8601
-        self.decoder = d
+    init(session: URLSession = .shared, baseURL: URL = URL(string: APIConfig.baseURL)!) {
         self.session = session
+        self.baseURL = baseURL
     }
 
-    /// Fetches F1 news from the backend.
-    /// - Parameters:
-    ///   - days: Number of days back to include.
-    ///   - limit: Maximum number of items to request.
     func fetchF1News(days: Int = 30, limit: Int = 20) async throws -> [NewsItem] {
-        var comps = URLComponents(url: baseURL.appendingPathComponent("api/news/f1"), resolvingAgainstBaseURL: false)!
+        var endpoint: URL
+        if baseURL.lastPathComponent == "api" {
+            endpoint = baseURL.appendingPathComponent("news").appendingPathComponent("f1")
+        } else {
+            endpoint = baseURL.appendingPathComponent("api").appendingPathComponent("news").appendingPathComponent("f1")
+        }
+
+        var comps = URLComponents(url: endpoint, resolvingAgainstBaseURL: false)!
         comps.queryItems = [
             URLQueryItem(name: "days", value: String(days)),
             URLQueryItem(name: "limit", value: String(limit))
         ]
-        let (data, _) = try await session.data(from: comps.url!)
-        return try decoder.decode([NewsItem].self, from: data)
+        let url = comps.url!
+        print("FETCH URL:", url.absoluteString) // TODO: remove verbose logs before release
+
+        let (data, _) = try await session.data(from: url)
+
+        let dec = JSONDecoder()
+        dec.dateDecodingStrategy = .iso8601
+
+        let items = try dec.decode([NewsItem].self, from: data)
+        print("DECODED ITEMS:", items.count) // TODO: remove verbose logs before release
+        return items
     }
 }
