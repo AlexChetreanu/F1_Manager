@@ -265,10 +265,8 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func fetchLocations(sessionKey: Int) {
-        let backendFormatter = DateFormatter()
-        backendFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSSSSS"
-        backendFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-        backendFormatter.locale = Locale(identifier: "en_US_POSIX")
+        let backendFormatter = ISO8601DateFormatter()
+        backendFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
         guard let startString = sessionStart,
               let start = backendFormatter.date(from: startString) else { return }
