@@ -119,24 +119,17 @@ struct HistoricalRaceView: View {
                 }
                 .padding(.bottom)
 
-                List(viewModel.drivers) { driver in
-                    if let loc = viewModel.currentPosition[driver.driver_number] {
-                        HStack {
-                            Text(driver.full_name)
-                            Spacer()
-                            Text(String(format: "(%.2f, %.2f)", loc.x, loc.y))
-                                .font(.caption)
-                        }
-                    } else {
-                        HStack {
-                            Text(driver.full_name)
-                            Spacer()
-                            Text("N/A")
-                                .font(.caption)
+                if !viewModel.raceControlMessages.isEmpty {
+                    List(viewModel.raceControlMessages) { msg in
+                        VStack(alignment: .leading) {
+                            ForEach(msg.details.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
+                                Text("\(key): \(value)")
+                                    .font(.caption)
+                            }
                         }
                     }
+                    .frame(maxHeight: 200)
                 }
-                .frame(maxHeight: 200)
             }
             Spacer()
         }

@@ -29,6 +29,40 @@ struct LocationPoint: Decodable {
     let y: Double
 }
 
+struct RaceControlMessage: Identifiable, Decodable {
+    let id = UUID()
+    let details: [String: String]
+
+    struct DynamicCodingKeys: CodingKey {
+        var stringValue: String
+        init?(stringValue: String) { self.stringValue = stringValue }
+        var intValue: Int?
+        init?(intValue: Int) {
+            self.intValue = intValue
+            self.stringValue = "\(intValue)"
+        }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: DynamicCodingKeys.self)
+        var temp: [String: String] = [:]
+        for key in container.allKeys {
+            if let v = try? container.decode(String.self, forKey: key) {
+                temp[key.stringValue] = v
+            } else if let v = try? container.decode(Int.self, forKey: key) {
+                temp[key.stringValue] = String(v)
+            } else if let v = try? container.decode(Double.self, forKey: key) {
+                temp[key.stringValue] = String(v)
+            } else if let v = try? container.decode(Bool.self, forKey: key) {
+                temp[key.stringValue] = String(v)
+            } else if (try? container.decodeNil(forKey: key)) == true {
+                temp[key.stringValue] = "null"
+            }
+        }
+        details = temp
+    }
+}
+
 class HistoricalRaceViewModel: ObservableObject {
     @Published var year: String = ""
     @Published var errorMessage: String?
@@ -45,6 +79,7 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var currentStepDuration: Double = 1.0
     @Published var debugEnabled = true
     @Published var diagnosisSummary: String?
+    @Published var raceControlMessages: [RaceControlMessage] = []
     let logger = DebugLogger()
     private var timer: Timer?
     private let speedOptions: [Double] = [1, 2, 5]
@@ -75,6 +110,7 @@ class HistoricalRaceViewModel: ObservableObject {
         stepIndex = 0
         positions.removeAll()
         currentPosition.removeAll()
+        raceControlMessages.removeAll()
         parseTrack(race.coordinates)
 
         guard let yearInt = Int(year) else {
@@ -153,6 +189,7 @@ class HistoricalRaceViewModel: ObservableObject {
                 self.sessionEnd = session.date_end
                 self.errorMessage = nil
                 self.fetchDrivers(sessionKey: session.session_key)
+                self.fetchRaceControl(sessionKey: session.session_key)
             }
         }.resume()
     }
@@ -163,6 +200,10 @@ class HistoricalRaceViewModel: ObservableObject {
 
     private struct LocationsResponse: Decodable {
         let data: [LocationPoint]
+    }
+
+    private struct RaceControlResponse: Decodable {
+        let data: [RaceControlMessage]
     }
 
     private func fetchDrivers(sessionKey: Int) {
@@ -185,6 +226,26 @@ class HistoricalRaceViewModel: ObservableObject {
                 }
             } catch {
                 self.log("decode /drivers", error.localizedDescription)
+            }
+        }.resume()
+    }
+
+    private func fetchRaceControl(sessionKey: Int) {
+        var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/race_control")!
+        comps.queryItems = [URLQueryItem(name: "session_key", value: String(sessionKey))]
+        guard let url = comps.url else { return }
+        URLSession.shared.dataTask(with: url) { data, resp, error in
+            self.log("GET /openf1/race_control", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+            if let error = error {
+                DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /race_control: \(error.localizedDescription)" }
+                return
+            }
+            guard let data = data else { return }
+            do {
+                let response = try JSONDecoder().decode(RaceControlResponse.self, from: data)
+                DispatchQueue.main.async { self.raceControlMessages = response.data }
+            } catch {
+                self.log("decode /race_control", error.localizedDescription)
             }
         }.resume()
     }
