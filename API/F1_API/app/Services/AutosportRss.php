@@ -24,13 +24,23 @@ class AutosportRss
      *
      * @return array<int, array<string, mixed>>
      */
-    public function fetch(int $days = 30, int $limit = 20): array
+    public function fetch(int $days = 30, int $limit = 20, ?int $year = null): array
     {
-        return Cache::remember("autosport_f1_news_{$days}_{$limit}", 3600, function () use ($days, $limit) {
+        $cacheKey = $year
+            ? "autosport_f1_news_{$year}_{$limit}"
+            : "autosport_f1_news_{$days}_{$limit}";
+
+        return Cache::remember($cacheKey, 3600, function () use ($days, $limit, $year) {
             $response = $this->client->get($this->url);
             $xml = new \SimpleXMLElement((string) $response->getBody());
 
-            $cutoff = Carbon::now()->subDays($days);
+            if ($year) {
+                $start = Carbon::create($year, 1, 1)->startOfDay();
+                $end = Carbon::create($year, 12, 31)->endOfDay();
+            } else {
+                $start = Carbon::now()->subDays($days);
+                $end = Carbon::now();
+            }
 
             $items = collect(iterator_to_array($xml->channel->item ?? []))->map(function ($item) {
                 $link = (string) $item->link;
@@ -53,8 +63,9 @@ class AutosportRss
                     'source' => 'Autosport',
                     'excerpt' => $excerpt,
                 ];
-            })->filter(function ($item) use ($cutoff) {
-                return Carbon::parse($item['published_at'])->greaterThanOrEqualTo($cutoff);
+            })->filter(function ($item) use ($start, $end) {
+                $published = Carbon::parse($item['published_at']);
+                return $published->betweenIncluded($start, $end);
             })->sortByDesc('published_at')->take($limit)->values()->all();
 
             return $items;
