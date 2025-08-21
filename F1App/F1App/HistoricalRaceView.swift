@@ -10,9 +10,13 @@ struct HistoricalRaceView: View {
     }
 
     @State private var selectedDriver: DriverSelection?
+    @StateObject private var eventsVM = HistoricEventsViewModel(sessionKey: 0)
+    @State private var playbackTimeMs: Int64 = 0
+    private let timer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        VStack {
+        ZStack(alignment: .topLeading) {
+            VStack {
             HStack {
                 TextField("Anul", text: $viewModel.year)
                     .keyboardType(.numberPad)
@@ -142,18 +146,26 @@ struct HistoricalRaceView: View {
             }
             Spacer()
         }
-        .sheet(isPresented: $showDebug) {
-            VStack {
-                if let sum = viewModel.diagnosisSummary {
-                    Text(sum).font(.headline).padding()
-                }
-                DebugLogView(logger: viewModel.logger)
+        EventToastsOverlay(toasts: eventsVM.activeToasts)
+    }
+    .onReceive(timer) { _ in
+        if viewModel.isRunning { playbackTimeMs += 250 }
+        eventsVM.update(nowMs: playbackTimeMs)
+    }
+    .onChange(of: viewModel.sessionKey) { key in
+        if let k = key { eventsVM.setSessionKey(k) }
+    }
+    .sheet(isPresented: $showDebug) {
+        VStack {
+            if let sum = viewModel.diagnosisSummary {
+                Text(sum).font(.headline).padding()
             }
+            DebugLogView(logger: viewModel.logger)
         }
-        .sheet(item: $selectedDriver) { selection in
-            DriverDetailView(driver: selection.driver,
-                             sessionKey: viewModel.sessionKey,
-                             raceViewModel: viewModel)
-        }
+    }
+    .sheet(item: $selectedDriver) { selection in
+        DriverDetailView(driver: selection.driver,
+                         sessionKey: viewModel.sessionKey,
+                         raceViewModel: viewModel)
     }
 }
