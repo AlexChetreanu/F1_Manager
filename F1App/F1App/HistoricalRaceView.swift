@@ -33,9 +33,13 @@ struct HistoricalRaceView: View {
                 GeometryReader { geo in
                     let bounds = CGRect(origin: .zero, size: geo.size)
                     let outOfBounds = viewModel.drivers.contains { driver in
-                        if let loc = viewModel.currentPosition[driver.driver_number] {
-                            let p = viewModel.point(for: loc, in: geo.size)
-                            return !bounds.contains(p)
+                        if viewModel.historicalSmoothEnabled,
+                           let p = viewModel.interpolatedPosition[driver.driver_number] {
+                            let pt = viewModel.point(forInterpolated: p, in: geo.size)
+                            return !bounds.contains(pt)
+                        } else if let loc = viewModel.currentPosition[driver.driver_number] {
+                            let pt = viewModel.point(for: loc, in: geo.size)
+                            return !bounds.contains(pt)
                         }
                         return false
                     }
@@ -55,7 +59,22 @@ struct HistoricalRaceView: View {
 
                         if !viewModel.currentPosition.isEmpty {
                             ForEach(viewModel.drivers) { driver in
-                                if let loc = viewModel.currentPosition[driver.driver_number] {
+                                if viewModel.historicalSmoothEnabled,
+                                   let p = viewModel.interpolatedPosition[driver.driver_number] {
+                                    let point = viewModel.point(forInterpolated: p, in: geo.size)
+                                    if bounds.contains(point) {
+                                        Circle()
+                                            .fill(Color(hex: driver.team_color ?? "FF0000"))
+                                            .frame(width: 8, height: 8)
+                                            .position(point)
+                                            .onTapGesture {
+                                                selectedDriver = DriverSelection(driver: driver)
+                                            }
+                                        Text(driver.initials)
+                                            .font(.caption2)
+                                            .position(x: point.x, y: point.y - 10)
+                                    }
+                                } else if let loc = viewModel.currentPosition[driver.driver_number] {
                                     let point = viewModel.point(for: loc, in: geo.size)
                                     if bounds.contains(point) {
                                         Circle()
@@ -125,6 +144,10 @@ struct HistoricalRaceView: View {
                     }
                 }
                 .padding(.bottom)
+                if viewModel.debugEnabled {
+                    Toggle("Smooth (historical)", isOn: $viewModel.historicalSmoothEnabled)
+                        .padding(.horizontal)
+                }
             }
             Spacer()
         }
