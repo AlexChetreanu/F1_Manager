@@ -11,7 +11,6 @@ use App\Http\Controllers\LiveController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HistoricalController;
 use App\Http\Controllers\NewsController;
-use App\Http\Controllers\RaceEventController;
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
@@ -24,7 +23,6 @@ Route::middleware('auth:sanctum')->put('/password', [PasswordController::class, 
 Route::get('/drivers', [DriverController::class, 'index']);
 
 Route::get('/races', [RaceController::class, 'apiIndex'])->name('races.api');
-Route::get('/races/{sessionKey}/events', [RaceEventController::class, 'index']);
 
 Route::get('/openf1/sessions/{session_key}/drivers', [OpenF1Controller::class, 'sessionDrivers']);
 Route::get('/openf1/sessions/{session_key}/laps', [OpenF1Controller::class, 'sessionLaps']);
