@@ -35,6 +35,7 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var drivers: [DriverInfo] = []
     @Published var positions: [Int: [LocationPoint]] = [:]
     @Published var currentPosition: [Int: LocationPoint] = [:]
+    @Published var interpolatedPosition: [Int: TimedPoint] = [:]
     @Published var isRunning = false
     @Published var trackPoints: [CGPoint] = []
     @Published var sessionKey: Int?
@@ -46,6 +47,9 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var debugEnabled = true
     @Published var diagnosisSummary: String?
     @Published var currentEventMessage: String?
+    @Published var showDriverDots: Bool = false
+    @Published var nowMs: Double = 0
+    @Published var raceDurationMs: Double = 0
     private var allRaceControlMessages: [RaceEventDTO] = []
     private var allOvertakes: [RaceEventDTO] = []
     private var nextRaceControlIndex = 0
@@ -59,7 +63,9 @@ class HistoricalRaceViewModel: ObservableObject {
     private var activeToasts: [ActiveToast] = []
     private let toastLifetimeMs: Int64 = 20_000
     let logger = DebugLogger()
-    private var timer: Timer?
+    private var playbackTimer: Timer?
+    private var lastTick: Date?
+    private var locationSamples: [Int: [TimedPoint]] = [:]
     private let speedOptions: [Double] = [1, 2, 5]
     private var speedIndex = 0
     private let dateFormatter: ISO8601DateFormatter = {
@@ -95,6 +101,10 @@ class HistoricalRaceViewModel: ObservableObject {
         stepIndex = 0
         positions.removeAll()
         currentPosition.removeAll()
+        interpolatedPosition.removeAll()
+        locationSamples.removeAll()
+        nowMs = 0
+        raceDurationMs = 0
         currentEventMessage = nil
         allRaceControlMessages.removeAll()
         allOvertakes.removeAll()
@@ -320,7 +330,8 @@ class HistoricalRaceViewModel: ObservableObject {
                                  startStr: startStr,
                                  endStr: endStr,
                                  offset: 0,
-                                 accumulated: [])
+                                 accumulatedLP: [],
+                                 accumulatedTP: [])
         }
 
         func fetchDriverLocations(driver: DriverInfo,
@@ -328,60 +339,53 @@ class HistoricalRaceViewModel: ObservableObject {
                                   startStr: String,
                                   endStr: String,
                                   offset: Int,
-                                  accumulated: [LocationPoint]) {
-            var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/location")!
-            comps.queryItems = [
-                URLQueryItem(name: "session_key", value: String(sessionKey)),
-                URLQueryItem(name: "driver_number", value: String(driver.driver_number)),
-                URLQueryItem(name: "date__gt", value: startStr),
-                URLQueryItem(name: "date__lt", value: endStr),
-                URLQueryItem(name: "order_by", value: "date"),
-                URLQueryItem(name: "limit", value: "1000"),
-                URLQueryItem(name: "offset", value: String(offset))
-            ]
-            guard let url = comps.url else { return }
-            URLSession.shared.dataTask(with: url) { data, resp, error in
-                self.log("GET /openf1/location", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
-                if let error = error {
+                                  accumulatedLP: [LocationPoint],
+                                  accumulatedTP: [TimedPoint]) {
+            TrackPositionService.shared.fetchLocations(sessionKey: sessionKey,
+                                                       driverNumber: driver.driver_number,
+                                                       dateGtISO: startStr,
+                                                       dateLtISO: endStr,
+                                                       limit: 1000,
+                                                       offset: offset) { result in
+                switch result {
+                case .failure(let error):
                     DispatchQueue.main.async {
                         self.errorMessage = "Eroare rețea la /location: \(error.localizedDescription)"
                         self.driverFetchCompleted()
                     }
-                    return
-                }
-                guard let data = data else {
-                    DispatchQueue.main.async { self.driverFetchCompleted() }
-                    return
-                }
-                do {
-                    let response = try JSONDecoder().decode(LocationsResponse.self, from: data)
-                    let converted = response.data.map { lp -> LocationPoint in
-                        var isoDate = lp.date
-                        if let d = self.backendFormatter.date(from: lp.date) {
-                            isoDate = self.dateFormatter.string(from: d)
-                        }
-                        return LocationPoint(driver_number: lp.driver_number, date: isoDate, x: lp.x, y: lp.y)
+                case .success(let locs):
+                    let lp = locs.map { dl -> LocationPoint in
+                        LocationPoint(driver_number: dl.driverNumber,
+                                      date: dl.dateIso,
+                                      x: Double(dl.x),
+                                      y: Double(dl.y))
                     }
-                    let newAccum = accumulated + converted
-                    if response.data.count == 1000 {
+                    let tp = locs.compactMap { dl -> TimedPoint? in
+                        guard let d = TrackPositionService.parseISO(dl.dateIso) else { return nil }
+                        return TimedPoint(t: d.timeIntervalSince1970, x: Double(dl.x), y: Double(dl.y))
+                    }
+                    let newLP = accumulatedLP + lp
+                    let newTP = accumulatedTP + tp
+                    if locs.count == 1000 {
                         fetchDriverLocations(driver: driver,
                                              sessionKey: sessionKey,
                                              startStr: startStr,
                                              endStr: endStr,
                                              offset: offset + 1000,
-                                             accumulated: newAccum)
+                                             accumulatedLP: newLP,
+                                             accumulatedTP: newTP)
                     } else {
                         DispatchQueue.main.async {
-                            self.positions[driver.driver_number] = newAccum
-                            self.currentPosition[driver.driver_number] = newAccum.first
+                            self.positions[driver.driver_number] = newLP
+                            self.locationSamples[driver.driver_number] = newTP.sorted { $0.t < $1.t }
+                            if let first = newTP.first {
+                                self.interpolatedPosition[driver.driver_number] = first
+                            }
                             self.driverFetchCompleted()
                         }
                     }
-                } catch {
-                    self.log("decode /location", error.localizedDescription)
-                    DispatchQueue.main.async { self.driverFetchCompleted() }
                 }
-            }.resume()
+            }
         }
     }
 
@@ -394,7 +398,11 @@ class HistoricalRaceViewModel: ObservableObject {
                 errorMessage = "Date indisponibile"
             } else {
                 calculateLocationBounds()
-                updatePositions()
+                if let minT = locationSamples.values.flatMap({ $0.map { $0.t } }).min(),
+                   let maxT = locationSamples.values.flatMap({ $0.map { $0.t } }).max() {
+                    raceDurationMs = (maxT - minT) * 1000
+                }
+                updateInterpolatedPositions()
             }
         }
     }
@@ -420,26 +428,33 @@ class HistoricalRaceViewModel: ObservableObject {
         return CGPoint(x: nx * size.width, y: ny * size.height)
     }
 
+    public func point(forInterpolated loc: TimedPoint, in size: CGSize) -> CGPoint {
+        guard locationBounds.width != 0, locationBounds.height != 0 else { return .zero }
+        let rawX = (loc.x - locationBounds.minX) / locationBounds.width
+        let rawY = 1 - (loc.y - locationBounds.minY) / locationBounds.height
+        let nx = max(0, min(rawX, 1))
+        let ny = max(0, min(rawY, 1))
+        return CGPoint(x: nx * size.width, y: ny * size.height)
+    }
+
     func start() {
         guard !isRunning else { pause(); return }
-        guard maxSteps > 0 else { return }
         isRunning = true
-        scheduleNextStep()
+        lastTick = Date()
+        playbackTimer = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] _ in
+            self?.tick()
+        }
     }
 
     func pause() {
         isRunning = false
-        timer?.invalidate()
-        timer = nil
+        playbackTimer?.invalidate()
+        playbackTimer = nil
     }
 
     func cycleSpeed() {
         speedIndex = (speedIndex + 1) % speedOptions.count
         playbackSpeed = speedOptions[speedIndex]
-        if isRunning {
-            timer?.invalidate()
-            scheduleNextStep()
-        }
     }
 
     var maxSteps: Int {
@@ -447,15 +462,39 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     func updatePositions() {
-        for driver in drivers {
-            if let arr = positions[driver.driver_number], stepIndex < arr.count {
-                currentPosition[driver.driver_number] = arr[stepIndex]
+        updateInterpolatedPositions()
+    }
+
+    private func tick() {
+        guard isRunning else { return }
+        let now = Date()
+        if let last = lastTick {
+            let delta = now.timeIntervalSince(last)
+            nowMs += delta * playbackSpeed * 1000
+            if raceDurationMs > 0 {
+                nowMs = min(nowMs, raceDurationMs)
             }
         }
-        if let start = sessionStartDate, let current = currentRaceDate() {
-            let nowMs = Int64(current.timeIntervalSince(start) * 1000)
-            onPlaybackTick(nowMs: nowMs)
+        lastTick = now
+        updateInterpolatedPositions()
+        onPlaybackTick(nowMs: Int64(nowMs))
+    }
+
+    private func updateInterpolatedPositions() {
+        guard let start = sessionStartDate else { return }
+        let nowAbs = start.addingTimeInterval(nowMs/1000)
+        let t = nowAbs.timeIntervalSince1970
+        for (driver, samples) in locationSamples {
+            if let interp = PositionInterpolator.interpolate(at: t, samples: samples) {
+                interpolatedPosition[driver] = TimedPoint(t: t, x: interp.x, y: interp.y)
+            }
         }
+    }
+
+    func seek(to ms: Double) {
+        nowMs = ms
+        updateInterpolatedPositions()
+        onPlaybackTick(nowMs: Int64(nowMs))
     }
 
     private func currentRaceDate() -> Date? {
@@ -508,37 +547,6 @@ class HistoricalRaceViewModel: ObservableObject {
         activeToasts.append(.init(id: e.id, event: e, expiresAtMs: expiresAtMs))
     }
 
-
-    private func scheduleNextStep() {
-        guard isRunning, stepIndex < maxSteps - 1,
-              let interval = timeIntervalForStep(stepIndex) else {
-            pause()
-            return
-        }
-        let scaled = interval / playbackSpeed
-        currentStepDuration = scaled
-        let newTimer = Timer(timeInterval: scaled, repeats: false) { _ in
-            withAnimation(.easeInOut(duration: self.currentStepDuration)) {
-                self.stepIndex += 1
-                self.updatePositions()
-            }
-            self.scheduleNextStep()
-        }
-        RunLoop.main.add(newTimer, forMode: .common)
-        timer = newTimer
-    }
-
-    private func timeIntervalForStep(_ index: Int) -> TimeInterval? {
-        for arr in positions.values {
-            if index + 1 < arr.count,
-               let start = dateFormatter.date(from: arr[index].date),
-               let end = dateFormatter.date(from: arr[index + 1].date) {
-                let diff = end.timeIntervalSince(start)
-                if diff > 0 { return diff }
-            }
-        }
-        return nil
-    }
 
     // MARK: - Debug diagnosis
 
