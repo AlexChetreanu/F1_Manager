@@ -121,10 +121,11 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var currentStepDuration: Double = 1.0
     @Published var debugEnabled = true
     @Published var diagnosisSummary: String?
-    @Published var raceControlMessages: [RaceControlMessage] = []
-    @Published var overtakeMessage: String?
+    @Published var currentEventMessage: String?
+    private var messageQueue: [String] = []
     private var allRaceControlMessages: [RaceControlMessage] = []
     private var allOvertakes: [OvertakeEvent] = []
+    private var nextRaceControlIndex = 0
     private var nextOvertakeIndex = 0
     let logger = DebugLogger()
     private var timer: Timer?
@@ -156,10 +157,11 @@ class HistoricalRaceViewModel: ObservableObject {
         stepIndex = 0
         positions.removeAll()
         currentPosition.removeAll()
-        raceControlMessages.removeAll()
-        overtakeMessage = nil
+        currentEventMessage = nil
+        messageQueue.removeAll()
         allRaceControlMessages.removeAll()
         allOvertakes.removeAll()
+        nextRaceControlIndex = 0
         nextOvertakeIndex = 0
         parseTrack(race.coordinates)
 
@@ -305,7 +307,7 @@ class HistoricalRaceViewModel: ObservableObject {
                 }
                 DispatchQueue.main.async {
                     self.allRaceControlMessages = sorted
-                    self.updateRaceControlMessages()
+                    self.nextRaceControlIndex = 0
                 }
             } catch {
                 self.log("decode /race_control", error.localizedDescription)
@@ -512,15 +514,22 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func updateRaceControlMessages() {
-        guard !allRaceControlMessages.isEmpty else { return }
+        guard nextRaceControlIndex < allRaceControlMessages.count else { return }
         guard let current = currentRaceDate() else { return }
-        let startOfMinute = Date(timeIntervalSinceReferenceDate: floor(current.timeIntervalSinceReferenceDate / 60) * 60)
-        let endOfMinute = startOfMinute.addingTimeInterval(60)
-        raceControlMessages = allRaceControlMessages.filter { msg in
-            if let dStr = msg.date, let d = dateFormatter.date(from: dStr) {
-                return d >= startOfMinute && d < endOfMinute
+        while nextRaceControlIndex < allRaceControlMessages.count {
+            let msg = allRaceControlMessages[nextRaceControlIndex]
+            guard let dStr = msg.date, let d = dateFormatter.date(from: dStr) else {
+                nextRaceControlIndex += 1
+                continue
             }
-            return false
+            if d <= current {
+                if let text = msg.message {
+                    enqueueMessage(text)
+                }
+                nextRaceControlIndex += 1
+            } else {
+                break
+            }
         }
     }
 
@@ -536,16 +545,28 @@ class HistoricalRaceViewModel: ObservableObject {
             if d <= current {
                 let overtaker = drivers.first { $0.driver_number == evt.overtakingDriverNumber }?.full_name ?? "?"
                 let overtaken = drivers.first { $0.driver_number == evt.overtakenDriverNumber }?.full_name ?? "?"
-                overtakeMessage = "\(overtaker) a depășit pe \(overtaken)"
-                DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                    if self.overtakeMessage == "\(overtaker) a depășit pe \(overtaken)" {
-                        self.overtakeMessage = nil
-                    }
-                }
+                enqueueMessage("\(overtaker) a depășit pe \(overtaken)")
                 nextOvertakeIndex += 1
             } else {
                 break
             }
+        }
+    }
+
+    private func enqueueMessage(_ message: String) {
+        messageQueue.append(message)
+        showNextMessageIfNeeded()
+    }
+
+    private func showNextMessageIfNeeded() {
+        guard currentEventMessage == nil, !messageQueue.isEmpty else { return }
+        let next = messageQueue.removeFirst()
+        currentEventMessage = next
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
+            if self.currentEventMessage == next {
+                self.currentEventMessage = nil
+            }
+            self.showNextMessageIfNeeded()
         }
     }
 

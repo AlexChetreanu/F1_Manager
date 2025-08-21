@@ -91,25 +91,11 @@ struct HistoricalRaceView: View {
                         .padding(.bottom)
                 }
 
-                if let overtake = viewModel.overtakeMessage {
-                    Text(overtake)
+                if let message = viewModel.currentEventMessage {
+                    Text(message)
                         .padding(8)
                         .background(Color.yellow.opacity(0.2))
                         .cornerRadius(8)
-                }
-
-                if !viewModel.raceControlMessages.isEmpty {
-                    List(viewModel.raceControlMessages) { msg in
-                        HStack(alignment: .top) {
-                            if let lap = msg.lapNumber {
-                                Text("Tur \(lap)")
-                                    .bold()
-                            }
-                            Text(msg.message ?? "")
-                                .font(.caption)
-                        }
-                    }
-                    .frame(maxHeight: 200)
                 }
 
                 if viewModel.maxSteps > 1 {
