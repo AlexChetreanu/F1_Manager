@@ -69,25 +69,27 @@ struct CircuitView: View {
                     }
                     .stroke(Color.blue, lineWidth: 2)
 
-                    ForEach(viewModel.drivers) { driver in
-                        if let loc = viewModel.currentPosition[driver.driver_number] {
-                            let p = viewModel.point(for: loc, in: geo.size)
-                            Button {
-                                if let loc = viewModel.currentPosition[driver.driver_number] {
-                                    selectedDriver = DriverSelection(driver: driver, point: loc)
+                    if viewModel.showDriverDots {
+                        ForEach(viewModel.drivers) { driver in
+                            if let loc = viewModel.currentPosition[driver.driver_number] {
+                                let p = viewModel.point(for: loc, in: geo.size)
+                                Button {
+                                    if let loc = viewModel.currentPosition[driver.driver_number] {
+                                        selectedDriver = DriverSelection(driver: driver, point: loc)
+                                    }
+                                } label: {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.red)
+                                            .frame(width: 8, height: 8)
+                                        Text(driver.initials)
+                                            .font(.caption2)
+                                            .offset(y: -10)
+                                    }
                                 }
-                            } label: {
-                                ZStack {
-                                    Circle()
-                                        .fill(Color.red)
-                                        .frame(width: 8, height: 8)
-                                    Text(driver.initials)
-                                        .font(.caption2)
-                                        .offset(y: -10)
-                                }
+                                .buttonStyle(PlainButtonStyle())
+                                .position(p)
                             }
-                            .buttonStyle(PlainButtonStyle())
-                            .position(p)
                         }
                     }
                 }
@@ -106,5 +108,6 @@ struct CircuitView: View {
                 }
             }
         }
+        .onAppear { viewModel.showDriverDots = false }
     }
 }
