@@ -56,3 +56,15 @@ func eventTimeMs(_ dto: RaceEventDTO, sessionStart: Date) -> Int64? {
     }
     return nil
 }
+
+extension RaceEventDTO {
+    var renderedText: String {
+        if let dn = driverNumber, let dover = driverNumberOvertaken {
+            let lapText = lapNumber.map { " — Lap \($0)" } ?? ""
+            return "Overtake: #\(dn) a depășit #\(dover)\(lapText)"
+        }
+        if let msg = message, !msg.isEmpty { return msg }
+        if let cat = category { return "Race Control: \(cat)" }
+        return "Eveniment cursă"
+    }
+}
