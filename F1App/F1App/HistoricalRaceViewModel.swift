@@ -232,7 +232,9 @@ class HistoricalRaceViewModel: ObservableObject {
             }
             guard let data = data else { return }
             do {
-                let response = try JSONDecoder().decode(EventsResponse.self, from: data)
+                let decoder = JSONDecoder()
+                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                let response = try decoder.decode(EventsResponse.self, from: data)
                 let sorted: [RaceEventDTO]
                 if let start = self.sessionStartDate {
                     sorted = response.data.sorted {
@@ -266,7 +268,9 @@ class HistoricalRaceViewModel: ObservableObject {
             }
             guard let data = data else { return }
             do {
-                let response = try JSONDecoder().decode(EventsResponse.self, from: data)
+                let decoder = JSONDecoder()
+                decoder.keyDecodingStrategy = .convertFromSnakeCase
+                let response = try decoder.decode(EventsResponse.self, from: data)
                 let sorted: [RaceEventDTO]
                 if let start = self.sessionStartDate {
                     sorted = response.data.sorted {
