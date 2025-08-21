@@ -27,7 +27,7 @@ class RaceControlController extends Controller
                 'rc.lap_number',
                 'rc.driver_number',
                 'rc.driver_number_overtaken',
-                'rc.date'
+                'rc.date as date'
             )
             ->selectRaw(
                 "DATE_FORMAT(CONVERT_TZ(rc.`date`, '+00:00', '+00:00'), '%Y-%m-%dT%H:%i:%s.%fZ') as date_iso"
@@ -51,7 +51,7 @@ class RaceControlController extends Controller
         $limit = min((int) $request->query('limit', self::DEFAULT_LIMIT), self::MAX_LIMIT);
         $offset = (int) $request->query('offset', 0);
 
-        $rows = $query->orderBy('rc.date')
+        $rows = $query->orderBy('rc.date', 'asc')
             ->limit($limit)
             ->offset($offset)
             ->get();
