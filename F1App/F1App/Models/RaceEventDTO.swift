@@ -46,9 +46,12 @@ func eventTimeMs(_ dto: RaceEventDTO, sessionStart: Date) -> Int64? {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = TimeZone(secondsFromGMT: 0)
-        f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSSSSS"
-        if let d = f.date(from: raw) {
-            return Int64(d.timeIntervalSince(sessionStart) * 1000)
+        let formats = ["yyyy-MM-dd HH:mm:ss.SSSSSS", "yyyy-MM-dd HH:mm:ss"]
+        for format in formats {
+            f.dateFormat = format
+            if let d = f.date(from: raw) {
+                return Int64(d.timeIntervalSince(sessionStart) * 1000)
+            }
         }
     }
     return nil
