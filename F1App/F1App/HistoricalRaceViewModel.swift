@@ -345,7 +345,7 @@ class HistoricalRaceViewModel: ObservableObject {
                     let response = try JSONDecoder().decode(LocationsResponse.self, from: data)
                     let converted = response.data.map { lp -> LocationPoint in
                         var isoDate = lp.date
-                        if let d = backendFormatter.date(from: lp.date) {
+                        if let d = self.backendFormatter.date(from: lp.date) {
                             isoDate = self.dateFormatter.string(from: d)
                         }
                         return LocationPoint(driver_number: lp.driver_number, date: isoDate, x: lp.x, y: lp.y)
