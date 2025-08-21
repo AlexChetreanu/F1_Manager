@@ -308,6 +308,7 @@ class HistoricalRaceViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.allRaceControlMessages = sorted
                     self.nextRaceControlIndex = 0
+                    self.log("race_control fetched", "count=\(sorted.count)")
                 }
             } catch {
                 self.log("decode /race_control", error.localizedDescription)
@@ -336,6 +337,7 @@ class HistoricalRaceViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.allOvertakes = sorted
                     self.nextOvertakeIndex = 0
+                    self.log("overtakes fetched", "count=\(sorted.count)")
                 }
             } catch {
                 self.log("decode /overtakes", error.localizedDescription)
@@ -519,12 +521,16 @@ class HistoricalRaceViewModel: ObservableObject {
         while nextRaceControlIndex < allRaceControlMessages.count {
             let msg = allRaceControlMessages[nextRaceControlIndex]
             guard let dStr = msg.date, let d = dateFormatter.date(from: dStr) else {
+                self.log("race_control skipped", "index=\(nextRaceControlIndex) missing date")
                 nextRaceControlIndex += 1
                 continue
             }
             if d <= current {
                 if let text = msg.message {
+                    self.log("race_control message", text)
                     enqueueMessage(text)
+                } else {
+                    self.log("race_control skipped", "index=\(nextRaceControlIndex) missing message")
                 }
                 nextRaceControlIndex += 1
             } else {
@@ -539,13 +545,16 @@ class HistoricalRaceViewModel: ObservableObject {
         while nextOvertakeIndex < allOvertakes.count {
             let evt = allOvertakes[nextOvertakeIndex]
             guard let dStr = evt.date, let d = dateFormatter.date(from: dStr) else {
+                self.log("overtake skipped", "index=\(nextOvertakeIndex) missing date")
                 nextOvertakeIndex += 1
                 continue
             }
             if d <= current {
                 let overtaker = drivers.first { $0.driver_number == evt.overtakingDriverNumber }?.full_name ?? "?"
                 let overtaken = drivers.first { $0.driver_number == evt.overtakenDriverNumber }?.full_name ?? "?"
-                enqueueMessage("\(overtaker) a depășit pe \(overtaken)")
+                let msg = "\(overtaker) a depășit pe \(overtaken)"
+                self.log("overtake message", msg)
+                enqueueMessage(msg)
                 nextOvertakeIndex += 1
             } else {
                 break
