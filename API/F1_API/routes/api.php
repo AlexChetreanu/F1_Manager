@@ -7,6 +7,8 @@ use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\DriverController;
 use App\Http\Controllers\RaceController;
 use App\Http\Controllers\OpenF1Controller;
+use App\Http\Controllers\RaceControlController;
+use App\Http\Controllers\OvertakesController;
 use App\Http\Controllers\LiveController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HistoricalController;
@@ -28,6 +30,8 @@ Route::get('/openf1/sessions/{session_key}/drivers', [OpenF1Controller::class, '
 Route::get('/openf1/sessions/{session_key}/laps', [OpenF1Controller::class, 'sessionLaps']);
 Route::get('/openf1/sessions/{session_key}/car_data', [OpenF1Controller::class, 'sessionCarData']);
 Route::get('/openf1/meetings/{meeting_key}/starting_grid', [OpenF1Controller::class, 'meetingGrid']);
+Route::get('/openf1/race_control', [RaceControlController::class, 'index']);
+Route::get('/openf1/overtakes', [OvertakesController::class, 'index']);
 Route::get('/openf1/{table}', [OpenF1Controller::class, 'query']);
 
 Route::get('/live/resolve', [LiveController::class, 'resolveSession']);
