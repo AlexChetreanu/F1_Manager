@@ -1,7 +1,6 @@
 import Foundation
 import SwiftUI
 import CoreLocation
-import QuartzCore
 
 struct DriverInfo: Identifiable, Decodable, Hashable {
     let driver_number: Int
@@ -47,9 +46,6 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var debugEnabled = true
     @Published var diagnosisSummary: String?
     @Published var currentEventMessage: String?
-    @Published var historicalSmoothEnabled: Bool = true
-    @Published var interpolatedPosition: [Int: (x: Double, y: Double)] = [:]
-    @Published var playbackNowMs: Int64 = 0
     private var allRaceControlMessages: [RaceEventDTO] = []
     private var allOvertakes: [RaceEventDTO] = []
     private var nextRaceControlIndex = 0
@@ -66,10 +62,6 @@ class HistoricalRaceViewModel: ObservableObject {
     private var timer: Timer?
     private let speedOptions: [Double] = [1, 2, 5]
     private var speedIndex = 0
-    private let locService = HistoricalLocationService()
-    private var sampleBuffers: [Int: [TimedPoint]] = [:]
-    private var displayLink: CADisplayLink?
-    private var lastDisplayTimestamp: TimeInterval?
     private let dateFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -87,10 +79,6 @@ class HistoricalRaceViewModel: ObservableObject {
     private var locationBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationFetchCount = 0
 
-    init() {
-        locService.logger = logger
-    }
-
     private func log(_ title: String, _ detail: String = "") {
         guard debugEnabled else { return }
         logger.log(title, detail)
@@ -107,9 +95,6 @@ class HistoricalRaceViewModel: ObservableObject {
         stepIndex = 0
         positions.removeAll()
         currentPosition.removeAll()
-        interpolatedPosition.removeAll()
-        sampleBuffers.removeAll()
-        playbackNowMs = 0
         currentEventMessage = nil
         allRaceControlMessages.removeAll()
         allOvertakes.removeAll()
@@ -435,32 +420,17 @@ class HistoricalRaceViewModel: ObservableObject {
         return CGPoint(x: nx * size.width, y: ny * size.height)
     }
 
-    public func point(forInterpolated p: (x: Double, y: Double), in size: CGSize) -> CGPoint {
-        guard locationBounds.width != 0, locationBounds.height != 0 else { return .zero }
-        let rawX = (p.x - locationBounds.minX) / locationBounds.width
-        let rawY = 1 - (p.y - locationBounds.minY) / locationBounds.height
-        let nx = max(0, min(rawX, 1))
-        let ny = max(0, min(rawY, 1))
-        return CGPoint(x: nx * size.width, y: ny * size.height)
-    }
-
     func start() {
         guard !isRunning else { pause(); return }
         guard maxSteps > 0 else { return }
         isRunning = true
         scheduleNextStep()
-        if historicalSmoothEnabled, let start = sessionStartDate {
-            let nowAbs = start.addingTimeInterval(TimeInterval(playbackNowMs) / 1000)
-            fetchSamplesIfNeeded(nowAbs: nowAbs)
-            startDisplayLink()
-        }
     }
 
     func pause() {
         isRunning = false
         timer?.invalidate()
         timer = nil
-        stopDisplayLink()
     }
 
     func cycleSpeed() {
@@ -484,7 +454,6 @@ class HistoricalRaceViewModel: ObservableObject {
         }
         if let start = sessionStartDate, let current = currentRaceDate() {
             let nowMs = Int64(current.timeIntervalSince(start) * 1000)
-            playbackNowMs = nowMs
             onPlaybackTick(nowMs: nowMs)
         }
     }
@@ -496,98 +465,6 @@ class HistoricalRaceViewModel: ObservableObject {
             }
         }
         return nil
-    }
-
-    private func startDisplayLink() {
-        stopDisplayLink()
-        displayLink = CADisplayLink(target: self, selector: #selector(displayLinkTick(_:)))
-        displayLink?.preferredFramesPerSecond = 60
-        displayLink?.add(to: .main, forMode: .common)
-        lastDisplayTimestamp = nil
-    }
-
-    private func stopDisplayLink() {
-        displayLink?.invalidate()
-        displayLink = nil
-        lastDisplayTimestamp = nil
-    }
-
-    @objc private func displayLinkTick(_ link: CADisplayLink) {
-        guard historicalSmoothEnabled, let start = sessionStartDate else { return }
-        if lastDisplayTimestamp == nil { lastDisplayTimestamp = link.timestamp }
-        let delta = (link.timestamp - (lastDisplayTimestamp ?? link.timestamp)) * playbackSpeed
-        playbackNowMs += Int64(delta * 1000)
-        lastDisplayTimestamp = link.timestamp
-        let nowAbs = start.addingTimeInterval(TimeInterval(playbackNowMs) / 1000)
-        updateInterpolatedPositions(nowAbs: nowAbs)
-        fetchSamplesIfNeeded(nowAbs: nowAbs)
-    }
-
-    private func updateInterpolatedPositions(nowAbs: Date) {
-        guard historicalSmoothEnabled, sessionStartDate != nil else { return }
-        let t = nowAbs.timeIntervalSince1970
-        for driver in drivers {
-            if let samples = sampleBuffers[driver.driver_number], !samples.isEmpty,
-               let p = PositionInterpolator.interpolate(at: t, samples: samples) {
-                interpolatedPosition[driver.driver_number] = p
-            }
-        }
-    }
-
-    private func fetchSamplesIfNeeded(nowAbs: Date) {
-        guard historicalSmoothEnabled, let sk = sessionKey else { return }
-        let t = nowAbs.timeIntervalSince1970
-        for driver in drivers {
-            var buffer = sampleBuffers[driver.driver_number] ?? []
-            let needFetch: Bool
-            if buffer.isEmpty {
-                needFetch = true
-            } else {
-                let windowAhead: TimeInterval = 60
-                let windowBehind: TimeInterval = 30
-                needFetch = t > (buffer.last!.t - windowAhead / 2) || t < (buffer.first!.t + windowBehind / 2)
-            }
-            if needFetch {
-                fetchSamples(for: driver.driver_number, around: nowAbs, sessionKey: sk)
-            }
-        }
-    }
-
-    private func fetchSamples(for driverNumber: Int, around nowAbs: Date, sessionKey: Int) {
-        let windowAhead: TimeInterval = 60
-        let windowBehind: TimeInterval = 30
-        let gt = nowAbs.addingTimeInterval(-windowBehind).iso8601FracZ()
-        let lt = nowAbs.addingTimeInterval(windowAhead).iso8601FracZ()
-        locService.fetchChunk(sessionKey: sessionKey, driverNumber: driverNumber, dateGtISO: gt, dateLtISO: lt) { result in
-            switch result {
-            case .success(let arr):
-                var points: [TimedPoint] = []
-                for dto in arr {
-                    var d: Date?
-                    if let iso = dto.dateIso { d = self.dateFormatter.date(from: iso) }
-                    if d == nil, let ds = dto.date { d = self.backendFormatter.date(from: ds) }
-                    if let d = d {
-                        points.append(TimedPoint(t: d.timeIntervalSince1970,
-                                                  x: Double(dto.x),
-                                                  y: Double(dto.y)))
-                    }
-                }
-                DispatchQueue.main.async {
-                    var buffer = self.sampleBuffers[driverNumber] ?? []
-                    buffer.append(contentsOf: points)
-                    buffer.sort { $0.t < $1.t }
-                    var unique: [TimedPoint] = []
-                    var lastT: TimeInterval?
-                    for p in buffer {
-                        if p.t != lastT { unique.append(p); lastT = p.t }
-                    }
-                    self.sampleBuffers[driverNumber] = unique
-                    self.updateInterpolatedPositions(nowAbs: nowAbs)
-                }
-            case .failure(let err):
-                self.log("chunk error", err.localizedDescription)
-            }
-        }
     }
 
     func onPlaybackTick(nowMs: Int64) {
