@@ -46,12 +46,18 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var debugEnabled = true
     @Published var diagnosisSummary: String?
     @Published var currentEventMessage: String?
-    private var messageQueue: [String] = []
     private var allRaceControlMessages: [RaceEventDTO] = []
     private var allOvertakes: [RaceEventDTO] = []
     private var nextRaceControlIndex = 0
     private var nextOvertakeIndex = 0
     private var sessionStartDate: Date?
+    private struct ActiveToast: Identifiable {
+        let id: Int64
+        let event: RaceEventDTO
+        let expiresAtMs: Int64
+    }
+    private var activeToasts: [ActiveToast] = []
+    private let toastLifetimeMs: Int64 = 20_000
     let logger = DebugLogger()
     private var timer: Timer?
     private let speedOptions: [Double] = [1, 2, 5]
@@ -90,11 +96,11 @@ class HistoricalRaceViewModel: ObservableObject {
         positions.removeAll()
         currentPosition.removeAll()
         currentEventMessage = nil
-        messageQueue.removeAll()
         allRaceControlMessages.removeAll()
         allOvertakes.removeAll()
         nextRaceControlIndex = 0
         nextOvertakeIndex = 0
+        activeToasts.removeAll()
         parseTrack(race.coordinates)
 
         guard let yearInt = Int(year) else {
@@ -178,8 +184,10 @@ class HistoricalRaceViewModel: ObservableObject {
                 self.sessionEnd = session.date_end
                 self.errorMessage = nil
                 self.fetchDrivers(sessionKey: session.session_key)
-                self.fetchRaceControl(sessionKey: session.session_key)
-                self.fetchOvertakes(sessionKey: session.session_key)
+                if self.sessionStartDate != nil {
+                    self.fetchRaceControl(sessionKey: session.session_key)
+                    self.fetchOvertakes(sessionKey: session.session_key)
+                }
             }
         }.resume()
     }
@@ -238,12 +246,12 @@ class HistoricalRaceViewModel: ObservableObject {
                 let sorted: [RaceEventDTO]
                 if let start = self.sessionStartDate {
                     sorted = response.data.sorted {
-                        let t1 = eventTimeMs($0, sessionStart: start) ?? Int64.max
-                        let t2 = eventTimeMs($1, sessionStart: start) ?? Int64.max
-                        return t1 < t2
+                        (eventTimeMs($0, sessionStart: start) ?? .max) < (eventTimeMs($1, sessionStart: start) ?? .max)
                     }
                 } else {
-                    sorted = response.data
+                    sorted = response.data.sorted {
+                        ($0.dateIso ?? $0.date ?? "") < ($1.dateIso ?? $1.date ?? "")
+                    }
                 }
                 DispatchQueue.main.async {
                     self.allRaceControlMessages = sorted
@@ -274,12 +282,12 @@ class HistoricalRaceViewModel: ObservableObject {
                 let sorted: [RaceEventDTO]
                 if let start = self.sessionStartDate {
                     sorted = response.data.sorted {
-                        let t1 = eventTimeMs($0, sessionStart: start) ?? Int64.max
-                        let t2 = eventTimeMs($1, sessionStart: start) ?? Int64.max
-                        return t1 < t2
+                        (eventTimeMs($0, sessionStart: start) ?? .max) < (eventTimeMs($1, sessionStart: start) ?? .max)
                     }
                 } else {
-                    sorted = response.data
+                    sorted = response.data.sorted {
+                        ($0.dateIso ?? $0.date ?? "") < ($1.dateIso ?? $1.date ?? "")
+                    }
                 }
                 DispatchQueue.main.async {
                     self.allOvertakes = sorted
@@ -444,8 +452,10 @@ class HistoricalRaceViewModel: ObservableObject {
                 currentPosition[driver.driver_number] = arr[stepIndex]
             }
         }
-        updateRaceControlMessages()
-        updateOvertakes()
+        if let start = sessionStartDate, let current = currentRaceDate() {
+            let nowMs = Int64(current.timeIntervalSince(start) * 1000)
+            onPlaybackTick(nowMs: nowMs)
+        }
     }
 
     private func currentRaceDate() -> Date? {
@@ -457,71 +467,47 @@ class HistoricalRaceViewModel: ObservableObject {
         return nil
     }
 
-    private func updateRaceControlMessages() {
-        guard nextRaceControlIndex < allRaceControlMessages.count else { return }
-        guard let start = sessionStartDate, let current = currentRaceDate() else { return }
-        let currentMs = Int64(current.timeIntervalSince(start) * 1000)
+    func onPlaybackTick(nowMs: Int64) {
+        guard let start = sessionStartDate else { return }
+
+        activeToasts.removeAll { $0.expiresAtMs <= nowMs }
+
         while nextRaceControlIndex < allRaceControlMessages.count {
-            let msg = allRaceControlMessages[nextRaceControlIndex]
-            guard let eventMs = eventTimeMs(msg, sessionStart: start) else {
-                self.log("race_control skipped", "index=\(nextRaceControlIndex) missing date")
+            let e = allRaceControlMessages[nextRaceControlIndex]
+            guard let t = eventTimeMs(e, sessionStart: start) else { nextRaceControlIndex += 1; continue }
+
+            if t <= nowMs && nowMs < t + toastLifetimeMs {
+                enqueueToast(for: e, expiresAtMs: t + toastLifetimeMs)
                 nextRaceControlIndex += 1
-                continue
-            }
-            if eventMs <= currentMs {
-                if let text = msg.message {
-                    self.log("race_control message", text)
-                    enqueueMessage(text)
-                } else {
-                    self.log("race_control skipped", "index=\(nextRaceControlIndex) missing message")
-                }
-                nextRaceControlIndex += 1
-            } else {
+            } else if t > nowMs {
                 break
+            } else {
+                nextRaceControlIndex += 1
             }
         }
-    }
 
-    private func updateOvertakes() {
-        guard nextOvertakeIndex < allOvertakes.count else { return }
-        guard let start = sessionStartDate, let current = currentRaceDate() else { return }
-        let currentMs = Int64(current.timeIntervalSince(start) * 1000)
         while nextOvertakeIndex < allOvertakes.count {
-            let evt = allOvertakes[nextOvertakeIndex]
-            guard let eventMs = eventTimeMs(evt, sessionStart: start) else {
-                self.log("overtake skipped", "index=\(nextOvertakeIndex) missing date")
+            let e = allOvertakes[nextOvertakeIndex]
+            guard let t = eventTimeMs(e, sessionStart: start) else { nextOvertakeIndex += 1; continue }
+
+            if t <= nowMs && nowMs < t + toastLifetimeMs {
+                enqueueToast(for: e, expiresAtMs: t + toastLifetimeMs)
                 nextOvertakeIndex += 1
-                continue
-            }
-            if eventMs <= currentMs {
-                let overtaker = drivers.first { $0.driver_number == evt.driverNumber }?.full_name ?? "?"
-                let overtaken = drivers.first { $0.driver_number == evt.driverNumberOvertaken }?.full_name ?? "?"
-                let msg = "\(overtaker) a depășit pe \(overtaken)"
-                self.log("overtake message", msg)
-                enqueueMessage(msg)
-                nextOvertakeIndex += 1
-            } else {
+            } else if t > nowMs {
                 break
+            } else {
+                nextOvertakeIndex += 1
             }
         }
+
+        currentEventMessage = activeToasts.first?.event.renderedText
     }
 
-    private func enqueueMessage(_ message: String) {
-        messageQueue.append(message)
-        showNextMessageIfNeeded()
+    private func enqueueToast(for e: RaceEventDTO, expiresAtMs: Int64) {
+        guard activeToasts.count < 3 else { return }
+        activeToasts.append(.init(id: e.id, event: e, expiresAtMs: expiresAtMs))
     }
 
-    private func showNextMessageIfNeeded() {
-        guard currentEventMessage == nil, !messageQueue.isEmpty else { return }
-        let next = messageQueue.removeFirst()
-        currentEventMessage = next
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
-            if self.currentEventMessage == next {
-                self.currentEventMessage = nil
-            }
-            self.showNextMessageIfNeeded()
-        }
-    }
 
     private func scheduleNextStep() {
         guard isRunning, stepIndex < maxSteps - 1,

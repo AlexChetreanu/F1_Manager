@@ -33,7 +33,7 @@ class RaceControlController extends Controller
                 "DATE_FORMAT(CONVERT_TZ(rc.`date`, '+00:00', '+00:00'), '%Y-%m-%dT%H:%i:%s.%fZ') as date_iso"
             )
             ->selectRaw(
-                "TIMESTAMPDIFF(MICROSECOND, s.`date_start`, rc.`date`) / 1000 as timestamp_ms"
+                "GREATEST(0, TIMESTAMPDIFF(MICROSECOND, s.`date_start`, rc.`date`) / 1000) as timestamp_ms"
             );
 
         if ($sessionKey = $request->query('session_key')) {
