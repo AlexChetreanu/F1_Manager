@@ -78,7 +78,7 @@ struct HistoricalRaceView: View {
                             }
                         }
                     }
-                    .animation(.easeInOut(duration: viewModel.currentStepDuration), value: viewModel.stepIndex)
+                    .animation(.linear(duration: viewModel.currentStepDuration), value: viewModel.stepIndex)
                 }
                 .frame(height: 300)
                 .background(Color.gray.opacity(0.1))
