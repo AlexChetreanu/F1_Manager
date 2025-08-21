@@ -22,7 +22,7 @@ class OvertakesController extends Controller
                 'o.driver_number',
                 'o.driver_number_overtaken',
                 'o.lap_number',
-                'o.date'
+                'o.date as date'
             )
             ->selectRaw(
                 "DATE_FORMAT(CONVERT_TZ(o.`date`, '+00:00', '+00:00'), '%Y-%m-%dT%H:%i:%s.%fZ') as date_iso"
@@ -46,7 +46,7 @@ class OvertakesController extends Controller
         $limit = min((int) $request->query('limit', self::DEFAULT_LIMIT), self::MAX_LIMIT);
         $offset = (int) $request->query('offset', 0);
 
-        $rows = $query->orderBy('o.date')
+        $rows = $query->orderBy('o.date', 'asc')
             ->limit($limit)
             ->offset($offset)
             ->get();
