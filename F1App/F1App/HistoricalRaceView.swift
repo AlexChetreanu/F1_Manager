@@ -33,8 +33,8 @@ struct HistoricalRaceView: View {
                 GeometryReader { geo in
                     let bounds = CGRect(origin: .zero, size: geo.size)
                     let outOfBounds = viewModel.drivers.contains { driver in
-                        if let loc = viewModel.interpolatedPosition[driver.driver_number] {
-                            let p = viewModel.point(forInterpolated: loc, in: geo.size)
+                        if let loc = viewModel.currentPosition[driver.driver_number] {
+                            let p = viewModel.point(for: loc, in: geo.size)
                             return !bounds.contains(p)
                         }
                         return false
@@ -53,10 +53,10 @@ struct HistoricalRaceView: View {
                         }
                         .stroke(Color.blue, lineWidth: 2)
 
-                        if !viewModel.interpolatedPosition.isEmpty {
+                        if !viewModel.currentPosition.isEmpty {
                             ForEach(viewModel.drivers) { driver in
-                                if let loc = viewModel.interpolatedPosition[driver.driver_number] {
-                                    let point = viewModel.point(forInterpolated: loc, in: geo.size)
+                                if let loc = viewModel.currentPosition[driver.driver_number] {
+                                    let point = viewModel.point(for: loc, in: geo.size)
                                     if bounds.contains(point) {
                                         Circle()
                                             .fill(Color(hex: driver.team_color ?? "FF0000"))
@@ -78,13 +78,14 @@ struct HistoricalRaceView: View {
                             }
                         }
                     }
+                    .animation(.easeInOut(duration: viewModel.currentStepDuration), value: viewModel.stepIndex)
                 }
                 .frame(height: 300)
                 .background(Color.gray.opacity(0.1))
                 .cornerRadius(8)
                 .padding()
 
-                if viewModel.interpolatedPosition.isEmpty && viewModel.errorMessage == nil {
+                if viewModel.currentPosition.isEmpty && viewModel.errorMessage == nil {
                     Text("Date indisponibile")
                         .foregroundColor(.red)
                         .padding(.bottom)
@@ -97,13 +98,14 @@ struct HistoricalRaceView: View {
                         .cornerRadius(8)
                 }
 
-                if viewModel.raceDurationMs > 0 {
+                if viewModel.maxSteps > 1 {
                     Slider(
                         value: Binding(
-                            get: { viewModel.nowMs },
-                            set: { viewModel.seek(to: $0) }
+                            get: { Double(viewModel.stepIndex) },
+                            set: { viewModel.stepIndex = Int($0); viewModel.updatePositions() }
                         ),
-                        in: 0...viewModel.raceDurationMs
+                        in: 0...Double(viewModel.maxSteps - 1),
+                        step: 1
                     )
                     .padding(.horizontal)
                 }
@@ -139,6 +141,5 @@ struct HistoricalRaceView: View {
                              sessionKey: viewModel.sessionKey,
                              raceViewModel: viewModel)
         }
-        .onAppear { viewModel.showDriverDots = true }
     }
 }
