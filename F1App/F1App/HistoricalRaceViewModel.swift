@@ -29,82 +29,6 @@ struct LocationPoint: Decodable {
     let y: Double
 }
 
-struct RaceControlMessage: Identifiable, Decodable {
-    let id = UUID()
-    let details: [String: String]
-
-    var lapNumber: Int? { details["lap_number"].flatMap { Int($0) } }
-    var message: String? { details["message"] }
-    var date: String? { details["date"] }
-
-    struct DynamicCodingKeys: CodingKey {
-        var stringValue: String
-        init?(stringValue: String) { self.stringValue = stringValue }
-        var intValue: Int?
-        init?(intValue: Int) {
-            self.intValue = intValue
-            self.stringValue = "\(intValue)"
-        }
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: DynamicCodingKeys.self)
-        var temp: [String: String] = [:]
-        for key in container.allKeys {
-            if let v = try? container.decode(String.self, forKey: key) {
-                temp[key.stringValue] = v
-            } else if let v = try? container.decode(Int.self, forKey: key) {
-                temp[key.stringValue] = String(v)
-            } else if let v = try? container.decode(Double.self, forKey: key) {
-                temp[key.stringValue] = String(v)
-            } else if let v = try? container.decode(Bool.self, forKey: key) {
-                temp[key.stringValue] = String(v)
-            } else if (try? container.decodeNil(forKey: key)) == true {
-                temp[key.stringValue] = "null"
-            }
-        }
-        details = temp
-    }
-}
-
-struct OvertakeEvent: Identifiable, Decodable {
-    let id = UUID()
-    let details: [String: String]
-
-    var date: String? { details["date"] }
-    var overtakingDriverNumber: Int? { details["overtaking_driver_number"].flatMap { Int($0) } }
-    var overtakenDriverNumber: Int? { details["overtaken_driver_number"].flatMap { Int($0) } }
-
-    struct DynamicCodingKeys: CodingKey {
-        var stringValue: String
-        init?(stringValue: String) { self.stringValue = stringValue }
-        var intValue: Int?
-        init?(intValue: Int) {
-            self.intValue = intValue
-            self.stringValue = "\(intValue)"
-        }
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: DynamicCodingKeys.self)
-        var temp: [String: String] = [:]
-        for key in container.allKeys {
-            if let v = try? container.decode(String.self, forKey: key) {
-                temp[key.stringValue] = v
-            } else if let v = try? container.decode(Int.self, forKey: key) {
-                temp[key.stringValue] = String(v)
-            } else if let v = try? container.decode(Double.self, forKey: key) {
-                temp[key.stringValue] = String(v)
-            } else if let v = try? container.decode(Bool.self, forKey: key) {
-                temp[key.stringValue] = String(v)
-            } else if (try? container.decodeNil(forKey: key)) == true {
-                temp[key.stringValue] = "null"
-            }
-        }
-        details = temp
-    }
-}
-
 class HistoricalRaceViewModel: ObservableObject {
     @Published var year: String = ""
     @Published var errorMessage: String?
@@ -123,10 +47,11 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var diagnosisSummary: String?
     @Published var currentEventMessage: String?
     private var messageQueue: [String] = []
-    private var allRaceControlMessages: [RaceControlMessage] = []
-    private var allOvertakes: [OvertakeEvent] = []
+    private var allRaceControlMessages: [RaceEventDTO] = []
+    private var allOvertakes: [RaceEventDTO] = []
     private var nextRaceControlIndex = 0
     private var nextOvertakeIndex = 0
+    private var sessionStartDate: Date?
     let logger = DebugLogger()
     private var timer: Timer?
     private let speedOptions: [Double] = [1, 2, 5]
@@ -136,6 +61,13 @@ class HistoricalRaceViewModel: ObservableObject {
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
         return formatter
+    }()
+    private let backendFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSSSSS"
+        return f
     }()
     private var trackBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
@@ -238,6 +170,11 @@ class HistoricalRaceViewModel: ObservableObject {
             DispatchQueue.main.async {
                 self.sessionKey = session.session_key
                 self.sessionStart = session.date_start
+                if let ds = session.date_start {
+                    self.sessionStartDate = self.backendFormatter.date(from: ds)
+                } else {
+                    self.sessionStartDate = nil
+                }
                 self.sessionEnd = session.date_end
                 self.errorMessage = nil
                 self.fetchDrivers(sessionKey: session.session_key)
@@ -255,12 +192,8 @@ class HistoricalRaceViewModel: ObservableObject {
         let data: [LocationPoint]
     }
 
-    private struct RaceControlResponse: Decodable {
-        let data: [RaceControlMessage]
-    }
-
-    private struct OvertakesResponse: Decodable {
-        let data: [OvertakeEvent]
+    private struct EventsResponse: Decodable {
+        let data: [RaceEventDTO]
     }
 
     private func fetchDrivers(sessionKey: Int) {
@@ -299,11 +232,16 @@ class HistoricalRaceViewModel: ObservableObject {
             }
             guard let data = data else { return }
             do {
-                let response = try JSONDecoder().decode(RaceControlResponse.self, from: data)
-                let sorted = response.data.sorted {
-                    guard let d1 = self.dateFormatter.date(from: $0.date ?? ""),
-                          let d2 = self.dateFormatter.date(from: $1.date ?? "") else { return false }
-                    return d1 < d2
+                let response = try JSONDecoder().decode(EventsResponse.self, from: data)
+                let sorted: [RaceEventDTO]
+                if let start = self.sessionStartDate {
+                    sorted = response.data.sorted {
+                        let t1 = eventTimeMs($0, sessionStart: start) ?? Int64.max
+                        let t2 = eventTimeMs($1, sessionStart: start) ?? Int64.max
+                        return t1 < t2
+                    }
+                } else {
+                    sorted = response.data
                 }
                 DispatchQueue.main.async {
                     self.allRaceControlMessages = sorted
@@ -328,11 +266,16 @@ class HistoricalRaceViewModel: ObservableObject {
             }
             guard let data = data else { return }
             do {
-                let response = try JSONDecoder().decode(OvertakesResponse.self, from: data)
-                let sorted = response.data.sorted {
-                    guard let d1 = self.dateFormatter.date(from: $0.date ?? ""),
-                          let d2 = self.dateFormatter.date(from: $1.date ?? "") else { return false }
-                    return d1 < d2
+                let response = try JSONDecoder().decode(EventsResponse.self, from: data)
+                let sorted: [RaceEventDTO]
+                if let start = self.sessionStartDate {
+                    sorted = response.data.sorted {
+                        let t1 = eventTimeMs($0, sessionStart: start) ?? Int64.max
+                        let t2 = eventTimeMs($1, sessionStart: start) ?? Int64.max
+                        return t1 < t2
+                    }
+                } else {
+                    sorted = response.data
                 }
                 DispatchQueue.main.async {
                     self.allOvertakes = sorted
@@ -346,11 +289,6 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func fetchLocations(sessionKey: Int) {
-        let backendFormatter = DateFormatter()
-        backendFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSSSSS"
-        backendFormatter.timeZone = TimeZone(secondsFromGMT: 0)
-        backendFormatter.locale = Locale(identifier: "en_US_POSIX")
-
         guard let startString = sessionStart,
               let start = backendFormatter.date(from: startString) else { return }
         let end: Date
@@ -517,15 +455,16 @@ class HistoricalRaceViewModel: ObservableObject {
 
     private func updateRaceControlMessages() {
         guard nextRaceControlIndex < allRaceControlMessages.count else { return }
-        guard let current = currentRaceDate() else { return }
+        guard let start = sessionStartDate, let current = currentRaceDate() else { return }
+        let currentMs = Int64(current.timeIntervalSince(start) * 1000)
         while nextRaceControlIndex < allRaceControlMessages.count {
             let msg = allRaceControlMessages[nextRaceControlIndex]
-            guard let dStr = msg.date, let d = dateFormatter.date(from: dStr) else {
+            guard let eventMs = eventTimeMs(msg, sessionStart: start) else {
                 self.log("race_control skipped", "index=\(nextRaceControlIndex) missing date")
                 nextRaceControlIndex += 1
                 continue
             }
-            if d <= current {
+            if eventMs <= currentMs {
                 if let text = msg.message {
                     self.log("race_control message", text)
                     enqueueMessage(text)
@@ -541,17 +480,18 @@ class HistoricalRaceViewModel: ObservableObject {
 
     private func updateOvertakes() {
         guard nextOvertakeIndex < allOvertakes.count else { return }
-        guard let current = currentRaceDate() else { return }
+        guard let start = sessionStartDate, let current = currentRaceDate() else { return }
+        let currentMs = Int64(current.timeIntervalSince(start) * 1000)
         while nextOvertakeIndex < allOvertakes.count {
             let evt = allOvertakes[nextOvertakeIndex]
-            guard let dStr = evt.date, let d = dateFormatter.date(from: dStr) else {
+            guard let eventMs = eventTimeMs(evt, sessionStart: start) else {
                 self.log("overtake skipped", "index=\(nextOvertakeIndex) missing date")
                 nextOvertakeIndex += 1
                 continue
             }
-            if d <= current {
-                let overtaker = drivers.first { $0.driver_number == evt.overtakingDriverNumber }?.full_name ?? "?"
-                let overtaken = drivers.first { $0.driver_number == evt.overtakenDriverNumber }?.full_name ?? "?"
+            if eventMs <= currentMs {
+                let overtaker = drivers.first { $0.driver_number == evt.driverNumber }?.full_name ?? "?"
+                let overtaken = drivers.first { $0.driver_number == evt.driverNumberOvertaken }?.full_name ?? "?"
                 let msg = "\(overtaker) a depășit pe \(overtaken)"
                 self.log("overtake message", msg)
                 enqueueMessage(msg)
