@@ -112,6 +112,16 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+        'openf1' => [
+            'driver' => env('DB_OPENF1_CONNECTION', 'sqlite'),
+            'url' => env('DB_OPENF1_URL'), // opțional
+            'database' => env('DB_OPENF1_DATABASE', database_path('openf1.sqlite')),
+            'prefix' => '',
+            'foreign_key_constraints' => true,
+        ],
+
+
+
     ],
 
     /*

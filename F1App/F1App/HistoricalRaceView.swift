@@ -3,6 +3,13 @@ import SwiftUI
 struct HistoricalRaceView: View {
     let race: Race
     @ObservedObject var viewModel: HistoricalRaceViewModel
+    @State private var showDebug = false
+    struct DriverSelection: Identifiable {
+        let driver: DriverInfo
+        var id: Int { driver.driver_number }
+    }
+
+    @State private var selectedDriver: DriverSelection?
 
     var body: some View {
         VStack {
@@ -55,6 +62,9 @@ struct HistoricalRaceView: View {
                                             .fill(Color(hex: driver.team_color ?? "FF0000"))
                                             .frame(width: 8, height: 8)
                                             .position(point)
+                                            .onTapGesture {
+                                                selectedDriver = DriverSelection(driver: driver)
+                                            }
                                         Text(driver.initials)
                                             .font(.caption2)
                                             .position(x: point.x, y: point.y - 10)
@@ -75,10 +85,17 @@ struct HistoricalRaceView: View {
                 .cornerRadius(8)
                 .padding()
 
-                if viewModel.currentPosition.isEmpty {
-                    Text("Date de locație indisponibile")
+                if viewModel.currentPosition.isEmpty && viewModel.errorMessage == nil {
+                    Text("Date indisponibile")
                         .foregroundColor(.red)
                         .padding(.bottom)
+                }
+
+                if let message = viewModel.currentEventMessage {
+                    Text(message)
+                        .padding(8)
+                        .background(Color.yellow.opacity(0.2))
+                        .cornerRadius(8)
                 }
 
                 if viewModel.maxSteps > 1 {
@@ -100,29 +117,29 @@ struct HistoricalRaceView: View {
                     Button("Viteză x\(Int(viewModel.playbackSpeed))") {
                         viewModel.cycleSpeed()
                     }
-                }
-                .padding(.bottom)
-
-                List(viewModel.drivers) { driver in
-                    if let loc = viewModel.currentPosition[driver.driver_number] {
-                        HStack {
-                            Text(driver.full_name)
-                            Spacer()
-                            Text(String(format: "(%.2f, %.2f)", loc.x, loc.y))
-                                .font(.caption)
-                        }
-                    } else {
-                        HStack {
-                            Text(driver.full_name)
-                            Spacer()
-                            Text("N/A")
-                                .font(.caption)
+                    if viewModel.debugEnabled {
+                        Button("Diagnose") {
+                            viewModel.runDiagnosis(for: race)
+                            showDebug = true
                         }
                     }
                 }
-                .frame(maxHeight: 200)
+                .padding(.bottom)
             }
             Spacer()
+        }
+        .sheet(isPresented: $showDebug) {
+            VStack {
+                if let sum = viewModel.diagnosisSummary {
+                    Text(sum).font(.headline).padding()
+                }
+                DebugLogView(logger: viewModel.logger)
+            }
+        }
+        .sheet(item: $selectedDriver) { selection in
+            DriverDetailView(driver: selection.driver,
+                             sessionKey: viewModel.sessionKey,
+                             raceViewModel: viewModel)
         }
     }
 }

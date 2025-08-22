@@ -10,6 +10,12 @@ import SwiftUI
 struct CircuitView: View {
     let coordinatesJSON: String?
     @ObservedObject var viewModel: HistoricalRaceViewModel
+    struct DriverSelection: Identifiable {
+        let driver: DriverInfo
+        let point: LocationPoint
+        var id: Int { driver.driver_number }
+    }
+    @State private var selectedDriver: DriverSelection?
 
     init(coordinatesJSON: String?, viewModel: HistoricalRaceViewModel) {
         self.coordinatesJSON = coordinatesJSON
@@ -66,19 +72,38 @@ struct CircuitView: View {
                     ForEach(viewModel.drivers) { driver in
                         if let loc = viewModel.currentPosition[driver.driver_number] {
                             let p = viewModel.point(for: loc, in: geo.size)
-                            Circle()
-                                .fill(Color.red)
-                                .frame(width: 8, height: 8)
-                                .position(p)
-                            Text(driver.initials)
-                                .font(.caption2)
-                                .position(x: p.x, y: p.y - 10)
+                            Button {
+                                if let loc = viewModel.currentPosition[driver.driver_number] {
+                                    selectedDriver = DriverSelection(driver: driver, point: loc)
+                                }
+                            } label: {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.red)
+                                        .frame(width: 8, height: 8)
+                                    Text(driver.initials)
+                                        .font(.caption2)
+                                        .offset(y: -10)
+                                }
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .position(p)
                         }
                     }
                 }
                 .animation(.linear(duration: 1), value: viewModel.stepIndex)
                 .background(Color.gray.opacity(0.1))
                 .cornerRadius(8)
+                .sheet(item: $selectedDriver) { selection in
+                    if let sk = viewModel.sessionKey {
+                        DriverDetailView(
+                            driver: selection.driver,
+                            sessionKey: sk,
+                            raceViewModel: viewModel
+                        )
+                    }
+
+                }
             }
         }
     }

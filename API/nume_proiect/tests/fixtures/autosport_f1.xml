@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+<channel>
+<title>Autosport F1 News</title>
+<item>
+<title>Recent 1</title>
+<link>https://example.com/1</link>
+<pubDate>Tue, 09 Jan 2024 10:00:00 GMT</pubDate>
+<media:content url="https://example.com/img1.jpg" />
+<description>Desc1</description>
+</item>
+<item>
+<title>Recent 2</title>
+<link>https://example.com/2</link>
+<pubDate>Mon, 08 Jan 2024 09:00:00 GMT</pubDate>
+<enclosure url="https://example.com/img2.jpg" />
+<description>Desc2</description>
+</item>
+<item>
+<title>Recent 3 no image</title>
+<link>https://example.com/3</link>
+<pubDate>Sun, 07 Jan 2024 08:00:00 GMT</pubDate>
+<description>Desc3</description>
+</item>
+<item>
+<title>Old 1</title>
+<link>https://example.com/4</link>
+<pubDate>Fri, 01 Dec 2023 08:00:00 GMT</pubDate>
+<media:content url="https://example.com/img4.jpg" />
+<description>Desc4</description>
+</item>
+<item>
+<title>Recent 4</title>
+<link>https://example.com/5</link>
+<pubDate>Sat, 06 Jan 2024 07:00:00 GMT</pubDate>
+<media:content url="https://example.com/img5.jpg" />
+<description>Desc5</description>
+</item>
+</channel>
+</rss>
