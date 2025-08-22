@@ -13,7 +13,7 @@ struct F1MarkShape: Shape {
 
         var path = Path()
 
-        // „F” stilizat (stânga)
+        // „F” stilizat
         path.move(to: P(0, 0))
         path.addLine(to: P(140, 0))
         path.addLine(to: P(140, 18))
@@ -24,11 +24,13 @@ struct F1MarkShape: Shape {
         path.addLine(to: P(0, 54))
         path.closeSubpath()
 
-        // „Aripa” / speed block (dreapta)
-        path.move(to: P(160, 0))
+        // Cifra „1” simplă
+        path.move(to: P(170, 0))
         path.addLine(to: P(260, 0))
+        path.addLine(to: P(240, 20))
+        path.addLine(to: P(210, 20))
         path.addLine(to: P(210, 54))
-        path.addLine(to: P(110, 54))
+        path.addLine(to: P(170, 54))
         path.closeSubpath()
 
         return path
