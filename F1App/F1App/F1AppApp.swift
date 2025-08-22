@@ -9,9 +9,21 @@ import SwiftUI
 
 @main
 struct F1AppApp: App {
+    @State private var showSplash = true
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ZStack {
+                ContentView()
+                    .opacity(showSplash ? 0 : 1)
+
+                if showSplash {
+                    VectorSplashView {
+                        showSplash = false
+                    }
+                    .transition(.opacity)
+                }
+            }
         }
     }
 }
