@@ -12,15 +12,16 @@ struct VectorSplashView: View {
             F1VectorLogo()
                 .scaleEffect(appear ? 1.0 : 0.85)
                 .opacity(appear ? 1.0 : 0.0)
-                .animation(.easeOut(duration: 0.45), value: appear)
+                .animation(.easeInOut(duration: 0.45), value: appear)
         }
         .onAppear {
             appear = true
-            // Finalizează splash-ul după ~1.2s
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                withAnimation(.easeInOut(duration: 0.25)) { onFinish() }
+                appear = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                    onFinish()
+                }
             }
-        
         }
     }
 }
