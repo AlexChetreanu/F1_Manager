@@ -372,8 +372,28 @@ class HistoricalRaceViewModel: ObservableObject {
                                              accumulated: newAccum)
                     } else {
                         DispatchQueue.main.async {
-                            self.positions[driver.driver_number] = newAccum
-                            self.currentPosition[driver.driver_number] = newAccum.first
+                            var processed = newAccum
+                            if newAccum.count > 2,
+                               let startDate = self.dateFormatter.date(from: newAccum[0].date) {
+                                let resampler = PositionResampler()
+                                let samples: [PositionSample] = newAccum.compactMap { lp in
+                                    guard let d = self.dateFormatter.date(from: lp.date) else { return nil }
+                                    let t = d.timeIntervalSince(startDate)
+                                    return PositionSample(t: t, x: lp.x, y: lp.y)
+                                }
+                                let smoothed = resampler.resample(samples: samples)
+                                processed = smoothed.map { s in
+                                    let date = startDate.addingTimeInterval(s.t)
+                                    return LocationPoint(
+                                        driver_number: driver.driver_number,
+                                        date: self.dateFormatter.string(from: date),
+                                        x: s.x,
+                                        y: s.y
+                                    )
+                                }
+                            }
+                            self.positions[driver.driver_number] = processed
+                            self.currentPosition[driver.driver_number] = processed.first
                             self.driverFetchCompleted()
                         }
                     }
