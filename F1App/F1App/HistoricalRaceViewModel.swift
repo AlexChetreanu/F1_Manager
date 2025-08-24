@@ -124,7 +124,7 @@ class HistoricalRaceViewModel: ObservableObject {
     private func fetchStrategy(sessionKey: Int) {
         Task {
             do {
-                let resp: StrategyResponse = try await getJSON("/historical/session/\(sessionKey)/strategy")
+                let resp: StrategyResponse = try await getJSON("/api/historical/session/\(sessionKey)/strategy")
                 await MainActor.run { self.strategySuggestions = resp.suggestions }
             } catch {
                 await MainActor.run { self.errorMessage = "Nu pot prelua strategia" }
