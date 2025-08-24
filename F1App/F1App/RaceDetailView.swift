@@ -13,6 +13,7 @@ struct RaceDetailView: View {
 
     @State private var selectedTab = 0
     @StateObject private var viewModel = HistoricalRaceViewModel()
+    @StateObject private var strategyViewModel = StrategyViewModel()
 
     var body: some View {
         VStack {
@@ -31,14 +32,18 @@ struct RaceDetailView: View {
                     .frame(height: UIScreen.main.bounds.height / 2)
                     .padding()
             } else if selectedTab == 1 {
-                Text("Section 2 content").font(.title)
+                List(strategyViewModel.messages, id: \.self) { msg in
+                    Text(msg)
+                }
             } else {
                 HistoricalRaceView(race: race, viewModel: viewModel)
             }
-            
+
             Spacer()
         }
         .navigationTitle(race.location)
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { strategyViewModel.start(sessionKey: race.id) }
+        .onDisappear { strategyViewModel.stop() }
     }
 }
