@@ -311,6 +311,9 @@
       <option name="pestRunnerSettings">
         <PestRunner configuration_file="$PROJECT_DIR$/API/F1_API/phpunit.xml" scope="ConfigurationFile" use_alternative_configuration_file="true" />
       </option>
+      <option name="runnerSettings">
+        <PhpTestRunnerSettings configuration_file="$PROJECT_DIR$/API/F1_API/phpunit.xml" scope="ConfigurationFile" use_alternative_configuration_file="true" />
+      </option>
       <method v="2" />
     </configuration>
   </component>
@@ -333,6 +336,7 @@
       <workItem from="1755097689392" duration="10646000" />
       <workItem from="1755259188236" duration="609000" />
       <workItem from="1755637070607" duration="3990000" />
+      <workItem from="1756038146769" duration="3418000" />
     </task>
     <servers />
   </component>
