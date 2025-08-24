@@ -1,19 +1,14 @@
 import Foundation
 
 enum APIConfig {
-    /// Base URL for API requests.
-    /// Defaults depend on the build target but can be overridden using
-    /// `UserDefaults.standard.set("http://192.168.1.10:8000", forKey: "api_base_url")`.
-    private static let defaultBaseURL: String = {
-        #if targetEnvironment(simulator)
-        return "http://127.0.0.1:8000"
-        #else
-        return "http://192.168.0.100:8000" // Replace with your Mac's LAN IP for physical device
-        #endif
+    /// Base URL for API requests, read from Info.plist.
+    static let baseURL: String = {
+        let raw = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String ?? "http://172.20.10.10:8000"
+        let url = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                      .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        assert(!url.contains("127.0.0.1") && !url.contains("localhost"),
+               "Use host IP (e.g., http://172.20.10.10:8000) in Simulator.")
+        return url
     }()
-
-    static var baseURL: String {
-        UserDefaults.standard.string(forKey: "api_base_url") ?? defaultBaseURL
-    }
 }
 
