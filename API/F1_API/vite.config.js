@@ -3,7 +3,9 @@ import laravel from 'laravel-vite-plugin'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const APP_URL = env.APP_URL || 'http://172.20.10.10:8000'
+  const host = env.VITE_DEV_HOST || 'MacBook-Pro-Alexandru.local'
+  const APP_URL = env.APP_URL || `http://${host}:8000`
+  const API_BASE_URL = env.VITE_API_BASE_URL || APP_URL
   return {
     plugins: [
       laravel({
@@ -16,11 +18,12 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       strictPort: true,
       hmr: {
-        host: 'localhost',
+        host,
       },
     },
     define: {
       __APP_URL__: JSON.stringify(APP_URL),
+      __API_BASE_URL__: JSON.stringify(API_BASE_URL),
     },
   }
 })
