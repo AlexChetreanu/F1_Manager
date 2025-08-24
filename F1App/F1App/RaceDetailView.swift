@@ -31,19 +31,7 @@ struct RaceDetailView: View {
                     .frame(height: UIScreen.main.bounds.height / 2)
                     .padding()
             } else if selectedTab == 1 {
-                List(viewModel.strategySuggestions) { s in
-                    VStack(alignment: .leading) {
-                        Text(s.driver_name ?? "Driver \(s.driver_number ?? 0)").font(.headline)
-                        Text(s.advice).bold()
-                        Text(s.why).font(.caption)
-                    }
-                }
-                .onAppear {
-                    if let sk = viewModel.sessionKey {
-                        viewModel.startStrategyUpdates(sessionKey: sk)
-                    }
-                }
-                .onDisappear { viewModel.stopStrategyUpdates() }
+                Text("Section 2 content").font(.title)
             } else {
                 HistoricalRaceView(race: race, viewModel: viewModel)
             }

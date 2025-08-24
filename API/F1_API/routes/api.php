@@ -11,7 +11,6 @@ use App\Http\Controllers\RaceControlController;
 use App\Http\Controllers\OvertakesController;
 use App\Http\Controllers\LiveController;
 use App\Http\Controllers\HistoricalController;
-use App\Http\Controllers\StrategyController;
 use App\Http\Controllers\NewsController;
 
 Route::post('/login', [AuthController::class, 'login']);
@@ -46,7 +45,6 @@ Route::prefix('historical')->middleware('throttle:120,1')->group(function () {
     Route::get('/session/{session_key}/events', [HistoricalController::class, 'events']);
     Route::get('/session/{session_key}/laps', [HistoricalController::class, 'laps']);
     Route::get('/session/{session_key}/frames', [HistoricalController::class, 'frames']);
-    Route::get('/session/{session_key}/strategy', [StrategyController::class, 'suggestions']);
 });
 Route::get('/health', fn () => response()->json(['ok' => true]));
 Route::get('/news/f1', [NewsController::class, 'f1Autosport']);

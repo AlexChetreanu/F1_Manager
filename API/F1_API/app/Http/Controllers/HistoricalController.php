@@ -43,7 +43,6 @@ class HistoricalController extends Controller
         }
 
         $session = $response->json()[0];
-        Cache::put('strategy_active_session', $session['session_key'], 600);
 
         return response()->json([
             'session_key' => $session['session_key'],
