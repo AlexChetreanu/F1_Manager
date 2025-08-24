@@ -29,6 +29,21 @@ struct LocationPoint: Decodable {
     let y: Double
 }
 
+struct StrategySuggestion: Identifiable, Decodable {
+    let driver_number: Int?
+    let driver_name: String?
+    let team: String?
+    let position: Int?
+    let advice: String
+    let why: String
+
+    var id: Int { driver_number ?? Int.random(in: 1000...9999) }
+}
+
+struct StrategyResponse: Decodable {
+    let suggestions: [StrategySuggestion]
+}
+
 class HistoricalRaceViewModel: ObservableObject {
     @Published var year: String = ""
     @Published var errorMessage: String?
@@ -46,6 +61,7 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var debugEnabled = true
     @Published var diagnosisSummary: String?
     @Published var currentEventMessage: String?
+    @Published var strategySuggestions: [StrategySuggestion] = []
     private var allRaceControlMessages: [RaceEventDTO] = []
     private var allOvertakes: [RaceEventDTO] = []
     private var nextRaceControlIndex = 0
@@ -78,6 +94,7 @@ class HistoricalRaceViewModel: ObservableObject {
     private var trackBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationFetchCount = 0
+    private var strategyTimer: Timer?
 
     private func log(_ title: String, _ detail: String = "") {
         guard debugEnabled else { return }
@@ -88,6 +105,31 @@ class HistoricalRaceViewModel: ObservableObject {
         guard let d = data else { return "<no body>" }
         let s = String(data: d, encoding: .utf8) ?? "<non-utf8 \(d.count) bytes>"
         return s.count > max ? String(s.prefix(max)) + " …" : s
+    }
+
+    func startStrategyUpdates(sessionKey: Int) {
+        strategyTimer?.invalidate()
+        strategyTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+            self.fetchStrategy(sessionKey: sessionKey)
+        }
+        strategyTimer?.tolerance = 5
+        fetchStrategy(sessionKey: sessionKey)
+    }
+
+    func stopStrategyUpdates() {
+        strategyTimer?.invalidate()
+        strategyTimer = nil
+    }
+
+    private func fetchStrategy(sessionKey: Int) {
+        Task {
+            do {
+                let resp: StrategyResponse = try await getJSON("/historical/session/\(sessionKey)/strategy")
+                await MainActor.run { self.strategySuggestions = resp.suggestions }
+            } catch {
+                await MainActor.run { self.errorMessage = "Nu pot prelua strategia" }
+            }
+        }
     }
 
     func load(for race: Race) {
