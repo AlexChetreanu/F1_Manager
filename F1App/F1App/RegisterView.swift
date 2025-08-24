@@ -65,11 +65,7 @@ struct RegisterView: View {
         isLoading = true
         errorMessage = nil
 
-        guard let url = URL(string: "http://127.0.0.1:8000/api/register") else {
-            self.errorMessage = "URL invalid"
-            self.isLoading = false
-            return
-        }
+        let url = API.url("/api/register")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

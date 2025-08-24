@@ -51,10 +51,7 @@ struct ChangePasswordView: View {
             return
         }
 
-        guard let url = URL(string: "http://127.0.0.1:8000/api/password") else {
-            errorMessage = "URL invalid"
-            return
-        }
+        let url = API.url("/api/password")
 
         var request = URLRequest(url: url)
         request.httpMethod = "PUT"
