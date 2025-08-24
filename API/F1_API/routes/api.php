@@ -13,7 +13,6 @@ use App\Http\Controllers\LiveController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\HistoricalController;
 use App\Http\Controllers\NewsController;
-use App\Http\Controllers\StrategyController;
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
@@ -50,5 +49,4 @@ Route::prefix('historical')->middleware('throttle:120,1')->group(function () {
 });
 Route::get('/health', [HealthController::class, 'index']);
 Route::get('/news/f1', [NewsController::class, 'f1Autosport']);
-Route::get('/strategy', [StrategyController::class, 'strategy']);
 
