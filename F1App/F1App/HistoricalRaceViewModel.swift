@@ -134,7 +134,6 @@ class HistoricalRaceViewModel: ObservableObject {
 
     func load(for race: Race) {
         pause()
-        stopStrategyUpdates()
         stepIndex = 0
         positions.removeAll()
         currentPosition.removeAll()
@@ -231,7 +230,6 @@ class HistoricalRaceViewModel: ObservableObject {
                     self.fetchRaceControl(sessionKey: session.session_key)
                     self.fetchOvertakes(sessionKey: session.session_key)
                 }
-                self.startStrategyUpdates(sessionKey: session.session_key)
             }
         }.resume()
     }
