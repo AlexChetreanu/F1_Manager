@@ -18,7 +18,7 @@ struct RaceDetailView: View {
         VStack {
             Picker("Select Section", selection: $selectedTab) {
                 Text("Circuit").tag(0)
-                Text("Strategie").tag(1)
+                Text("Section 2").tag(1)
                 Text("Curse istorice").tag(2)
             }
             .pickerStyle(SegmentedPickerStyle())
@@ -38,6 +38,12 @@ struct RaceDetailView: View {
                         Text(s.why).font(.caption)
                     }
                 }
+                .onAppear {
+                    if let sk = viewModel.sessionKey {
+                        viewModel.startStrategyUpdates(sessionKey: sk)
+                    }
+                }
+                .onDisappear { viewModel.stopStrategyUpdates() }
             } else {
                 HistoricalRaceView(race: race, viewModel: viewModel)
             }
@@ -46,6 +52,5 @@ struct RaceDetailView: View {
         }
         .navigationTitle(race.location)
         .navigationBarTitleDisplayMode(.inline)
-        .onDisappear { viewModel.stopStrategyUpdates() }
     }
 }
