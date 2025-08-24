@@ -12,20 +12,13 @@ class RacesViewModel: ObservableObject {
     @Published var races = [Race]()
 
     func fetchRaces() {
-        guard let url = URL(string: "\(API.base)/api/races") else { return }
-
-        URLSession.shared.dataTask(with: url) { data, response, error in
-            if let data = data {
-                if let decoded = try? JSONDecoder().decode([Race].self, from: data) {
-                    DispatchQueue.main.async {
-                        self.races = decoded
-                    }
-                } else {
-                    print("Decoding failed")
-                }
-            } else if let error = error {
+        Task {
+            do {
+                let races: [Race] = try await getJSON("/api/races")
+                await MainActor.run { self.races = races }
+            } catch {
                 print("Error fetching races:", error)
             }
-        }.resume()
+        }
     }
 }

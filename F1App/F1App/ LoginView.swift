@@ -67,11 +67,7 @@ struct LoginView: View {
         isLoading = true
         errorMessage = nil
 
-        guard let url = URL(string: "http://127.0.0.1:8000/api/login") else {
-            self.errorMessage = "URL invalid"
-            self.isLoading = false
-            return
-        }
+        let url = API.url("/api/login")
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

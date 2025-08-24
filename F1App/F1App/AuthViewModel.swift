@@ -17,13 +17,12 @@ class AuthViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     func login() {
-        guard let url = URL(string: "http://127.0.0.1:8000/login") else { return }
+        let url = API.url("/api/login")
 
         let body: [String: String] = [
             "email": email,
             "password": password
         ]
-
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

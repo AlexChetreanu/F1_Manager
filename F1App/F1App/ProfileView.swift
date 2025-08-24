@@ -91,14 +91,15 @@ struct ProfileView: View {
     }
     
     func logout() {
-        guard let token = token, let url = URL(string: "http://127.0.0.1:8000/api/logout") else {
+        guard let token = token else {
             self.token = nil
             return
         }
-        
+
         isLoggingOut = true
         logoutError = nil
-        
+
+        let url = API.url("/api/logout")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
