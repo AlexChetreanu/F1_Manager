@@ -13,7 +13,7 @@ class AutosportRss
     protected Client $client;
     protected string $url = 'https://www.autosport.com/rss/f1/news/';
 
-    public function __construct(Client $client = null)
+    public function __construct(?Client $client = null)
     {
         $this->client = $client ?? new Client([
             'timeout' => (int) env('AUTOSPORT_RSS_TIMEOUT', 10),
