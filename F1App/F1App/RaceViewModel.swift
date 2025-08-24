@@ -12,7 +12,7 @@ class RacesViewModel: ObservableObject {
     @Published var races = [Race]()
 
     func fetchRaces() {
-        guard let url = URL(string: "\(APIConfig.baseURL)/api/races") else { return }
+        guard let url = URL(string: "\(API.base)/api/races") else { return }
 
         URLSession.shared.dataTask(with: url) { data, response, error in
             if let data = data {

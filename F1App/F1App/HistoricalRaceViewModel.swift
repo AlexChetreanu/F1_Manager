@@ -144,7 +144,7 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func resolveSession(year: Int, meetingKey: Int?, circuitKey: Int?) {
-        var comps = URLComponents(string: "\(APIConfig.baseURL)/api/live/resolve")!
+        var comps = URLComponents(string: "\(API.base)/api/live/resolve")!
         var items = [
             URLQueryItem(name: "year", value: String(year)),
             URLQueryItem(name: "session_type", value: "Race")
@@ -205,7 +205,7 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func fetchDrivers(sessionKey: Int) {
-        var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/drivers")!
+        var comps = URLComponents(string: "\(API.base)/api/openf1/drivers")!
         comps.queryItems = [URLQueryItem(name: "session_key", value: String(sessionKey))]
         guard let url = comps.url else { return }
         URLSession.shared.dataTask(with: url) { data, resp, error in
@@ -229,7 +229,7 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func fetchRaceControl(sessionKey: Int) {
-        var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/race_control")!
+        var comps = URLComponents(string: "\(API.base)/api/openf1/race_control")!
         comps.queryItems = [URLQueryItem(name: "session_key", value: String(sessionKey))]
         guard let url = comps.url else { return }
         URLSession.shared.dataTask(with: url) { data, resp, error in
@@ -265,7 +265,7 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func fetchOvertakes(sessionKey: Int) {
-        var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/overtakes")!
+        var comps = URLComponents(string: "\(API.base)/api/openf1/overtakes")!
         comps.queryItems = [URLQueryItem(name: "session_key", value: String(sessionKey))]
         guard let url = comps.url else { return }
         URLSession.shared.dataTask(with: url) { data, resp, error in
@@ -329,7 +329,7 @@ class HistoricalRaceViewModel: ObservableObject {
                                   endStr: String,
                                   offset: Int,
                                   accumulated: [LocationPoint]) {
-            var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/location")!
+            var comps = URLComponents(string: "\(API.base)/api/openf1/location")!
             comps.queryItems = [
                 URLQueryItem(name: "session_key", value: String(sessionKey)),
                 URLQueryItem(name: "driver_number", value: String(driver.driver_number)),
@@ -568,11 +568,11 @@ class HistoricalRaceViewModel: ObservableObject {
         log(
           "Starting diagnosis",
           """
-          year=\(year), circuit_id=\(race.circuit_id ?? "nil"), date=\(race.date) baseURL=\(APIConfig.baseURL)
+          year=\(year), circuit_id=\(race.circuit_id ?? "nil"), date=\(race.date) baseURL=\(API.base)
           """
         )
 
-        let healthURL = URL(string: "\(APIConfig.baseURL)/api/health")!
+        let healthURL = URL(string: "\(API.base)/api/health")!
         URLSession.shared.dataTask(with: healthURL) { data, resp, err in
             self.log("GET /api/health", "err=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
 
@@ -585,7 +585,7 @@ class HistoricalRaceViewModel: ObservableObject {
                 return
             }
 
-            var comps = URLComponents(string: "\(APIConfig.baseURL)/api/live/resolve")!
+            var comps = URLComponents(string: "\(API.base)/api/live/resolve")!
             comps.queryItems = [
                 URLQueryItem(name: "year", value: String(yearInt)),
                 URLQueryItem(name: "circuit_key", value: String(circuitKey)),
@@ -600,7 +600,7 @@ class HistoricalRaceViewModel: ObservableObject {
                     return
                 }
                 let sk = session.session_key
-                var driversComps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/drivers")!
+                var driversComps = URLComponents(string: "\(API.base)/api/openf1/drivers")!
                 driversComps.queryItems = [URLQueryItem(name: "session_key", value: String(sk)), URLQueryItem(name: "limit", value: "5")]
                 let driversURL = driversComps.url!
                 URLSession.shared.dataTask(with: driversURL) { data, resp, err in
@@ -610,7 +610,7 @@ class HistoricalRaceViewModel: ObservableObject {
                         return
                     }
                     let countDrivers = dr.data.count
-                    var locURLC = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/location")!
+                    var locURLC = URLComponents(string: "\(API.base)/api/openf1/location")!
                     locURLC.queryItems = [
                         URLQueryItem(name: "session_key", value: String(sk)),
                         URLQueryItem(name: "order_by", value: "date"),

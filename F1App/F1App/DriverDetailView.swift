@@ -127,7 +127,7 @@ class DriverDetailViewModel: ObservableObject {
         let endDate = startDate.addingTimeInterval(1)
         let endTimestamp = formatter.string(from: endDate)
 
-        var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/car_data")!
+        var comps = URLComponents(string: "\(API.base)/api/openf1/car_data")!
         comps.queryItems = [
             URLQueryItem(name: "session_key", value: String(sessionKey)),
             URLQueryItem(name: "driver_number", value: String(driverNumber)),
@@ -183,7 +183,7 @@ class DriverDetailViewModel: ObservableObject {
     private func fetchPosition(at timestamp: String) {
         guard let sessionKey = sessionKey else { return }
 
-        var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/position")!
+        var comps = URLComponents(string: "\(API.base)/api/openf1/position")!
         comps.queryItems = [
             URLQueryItem(name: "session_key", value: String(sessionKey)),
             URLQueryItem(name: "driver_number", value: String(driverNumber)),
@@ -221,7 +221,7 @@ class DriverDetailViewModel: ObservableObject {
 
     func fetchStatus() {
         guard let sessionKey = sessionKey else { return }
-        var comps = URLComponents(string: "\(APIConfig.baseURL)/api/openf1/session_result")!
+        var comps = URLComponents(string: "\(API.base)/api/openf1/session_result")!
         comps.queryItems = [
             URLQueryItem(name: "session_key", value: String(sessionKey)),
             URLQueryItem(name: "driver_number", value: String(driverNumber)),
