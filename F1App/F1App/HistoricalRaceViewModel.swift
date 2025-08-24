@@ -53,6 +53,7 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var isRunning = false
     @Published var trackPoints: [CGPoint] = []
     @Published var sessionKey: Int?
+    @Published var meetingKey: Int?
     @Published var sessionStart: String?
     @Published var sessionEnd: String?
     @Published var stepIndex: Int = 0
@@ -107,13 +108,13 @@ class HistoricalRaceViewModel: ObservableObject {
         return s.count > max ? String(s.prefix(max)) + " …" : s
     }
 
-    func startStrategyUpdates(sessionKey: Int) {
+    func startStrategyUpdates(meetingKey: Int) {
         strategyTimer?.invalidate()
         strategyTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
-            self.fetchStrategy(sessionKey: sessionKey)
+            self.fetchStrategy(meetingKey: meetingKey)
         }
         strategyTimer?.tolerance = 5
-        fetchStrategy(sessionKey: sessionKey)
+        fetchStrategy(meetingKey: meetingKey)
     }
 
     func stopStrategyUpdates() {
@@ -121,10 +122,10 @@ class HistoricalRaceViewModel: ObservableObject {
         strategyTimer = nil
     }
 
-    private func fetchStrategy(sessionKey: Int) {
+    private func fetchStrategy(meetingKey: Int) {
         Task {
             do {
-                let resp: StrategyResponse = try await getJSON("/api/historical/session/\(sessionKey)/strategy")
+                let resp: StrategyResponse = try await getJSON("/api/historical/meeting/\(meetingKey)/strategy")
                 await MainActor.run { self.strategySuggestions = resp.suggestions }
             } catch {
                 await MainActor.run { self.errorMessage = "Nu pot prelua strategia" }
@@ -181,6 +182,7 @@ class HistoricalRaceViewModel: ObservableObject {
 
     private struct ResolveResponse: Decodable {
         let session_key: Int
+        let meeting_key: Int
         let date_start: String?
         let date_end: String?
     }
@@ -217,6 +219,7 @@ class HistoricalRaceViewModel: ObservableObject {
             }
             DispatchQueue.main.async {
                 self.sessionKey = session.session_key
+                self.meetingKey = session.meeting_key
                 self.sessionStart = session.date_start
                 if let ds = session.date_start {
                     self.sessionStartDate = self.backendFormatter.date(from: ds)

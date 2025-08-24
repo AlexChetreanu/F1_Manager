@@ -26,9 +26,9 @@ def get_df(endpoint: str, **params) -> pd.DataFrame:
     data = _http_get(endpoint, **params)
     return pd.DataFrame(data)
 
-def build_session_minute_frame(session_key: int) -> pd.DataFrame:
-    pos = get_df('position', session_key=session_key)
-    drv = get_df('drivers', session_key=session_key)
+def build_session_minute_frame(meeting_key: int) -> pd.DataFrame:
+    pos = get_df('position', meeting_key=meeting_key)
+    drv = get_df('drivers', meeting_key=meeting_key)
     if pos.empty or drv.empty:
         return pd.DataFrame()
     # openf1 timestamps may omit fractional seconds, so force ISO8601 parsing
@@ -37,8 +37,8 @@ def build_session_minute_frame(session_key: int) -> pd.DataFrame:
     df = df.merge(drv[['driver_number','full_name','team_name']], on='driver_number', how='left')
     return df
 
-def suggest_all_now(session_key: int) -> List[Dict]:
-    df = build_session_minute_frame(session_key)
+def suggest_all_now(meeting_key: int) -> List[Dict]:
+    df = build_session_minute_frame(meeting_key)
     if df.empty:
         return []
     latest = df[df['minute']==df['minute'].max()]
@@ -57,7 +57,7 @@ def suggest_all_now(session_key: int) -> List[Dict]:
 if __name__ == '__main__':
     import argparse
     p = argparse.ArgumentParser('F1 Strategy Bot (simplified)')
-    p.add_argument('--session-key', type=int, required=True)
+    p.add_argument('--meeting-key', type=int, required=True)
     args = p.parse_args()
-    sug = suggest_all_now(args.session_key)
-    print(json.dumps({'session_key': args.session_key, 'suggestions': sug}, indent=2))
+    sug = suggest_all_now(args.meeting_key)
+    print(json.dumps({'meeting_key': args.meeting_key, 'suggestions': sug}, indent=2))
