@@ -39,8 +39,8 @@ struct RaceDetailView: View {
                     }
                 }
                 .onAppear {
-                    if let sk = viewModel.sessionKey {
-                        viewModel.startStrategyUpdates(sessionKey: sk)
+                    if let mk = viewModel.meetingKey {
+                        viewModel.startStrategyUpdates(meetingKey: mk)
                     }
                 }
                 .onDisappear { viewModel.stopStrategyUpdates() }
