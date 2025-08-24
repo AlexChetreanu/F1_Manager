@@ -4,7 +4,7 @@ final class NewsService {
     let session: URLSession
     let baseURL: URL
 
-    init(session: URLSession = .shared, baseURL: URL = URL(string: APIConfig.baseURL)!) {
+    init(session: URLSession = .shared, baseURL: URL = URL(string: API.base)!) {
         self.session = session
         self.baseURL = baseURL
     }
