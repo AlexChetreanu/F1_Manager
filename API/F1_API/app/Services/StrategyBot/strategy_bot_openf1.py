@@ -31,7 +31,8 @@ def build_session_minute_frame(session_key: int) -> pd.DataFrame:
     drv = get_df('drivers', session_key=session_key)
     if pos.empty or drv.empty:
         return pd.DataFrame()
-    pos['minute'] = pd.to_datetime(pos['date']).dt.floor('min')
+    # openf1 timestamps may omit fractional seconds, so force ISO8601 parsing
+    pos['minute'] = pd.to_datetime(pos['date'], format='ISO8601').dt.floor('min')
     df = pos[['minute','driver_number','position']]
     df = df.merge(drv[['driver_number','full_name','team_name']], on='driver_number', how='left')
     return df
