@@ -69,6 +69,7 @@ def _coerce_driver_number(df: pd.DataFrame) -> pd.DataFrame:
 
 def get_df(endpoint: str, **params) -> pd.DataFrame:
     data = _http_get(endpoint, **params)
+<<<<<<< HEAD
     df = pd.DataFrame(data) if data else pd.DataFrame()
     # uniformizează cheile de merge & câteva câmpuri numerice
     df = _coerce_driver_number(df)
@@ -92,6 +93,23 @@ def _parse_tplus(s: str) -> timedelta:
 # ========================= API wrappers (fără limit=) =========================
 def meetings_by_year(year: int) -> pd.DataFrame:
     df = get_df("meetings", year=int(year))
+=======
+    return pd.DataFrame(data)
+
+def build_session_minute_frame(meeting_key: int) -> pd.DataFrame:
+    pos = get_df('position', meeting_key=meeting_key)
+    drv = get_df('drivers', meeting_key=meeting_key)
+    if pos.empty or drv.empty:
+        return pd.DataFrame()
+    # openf1 timestamps may omit fractional seconds, so force ISO8601 parsing
+    pos['minute'] = pd.to_datetime(pos['date'], format='ISO8601').dt.floor('min')
+    df = pos[['minute','driver_number','position']]
+    df = df.merge(drv[['driver_number','full_name','team_name']], on='driver_number', how='left')
+    return df
+
+def suggest_all_now(meeting_key: int) -> List[Dict]:
+    df = build_session_minute_frame(meeting_key)
+>>>>>>> 35d1832392b417e7f8b4fde0dd2e185ff5bcbd64
     if df.empty:
         df = get_df("meetings", **{
             "date_start>=": f"{year}-01-01T00:00:00Z",
@@ -661,6 +679,7 @@ def run_year(year: int) -> pd.DataFrame:
 # ========================= CLI =========================
 if __name__ == "__main__":
     import argparse
+<<<<<<< HEAD
     p = argparse.ArgumentParser("F1 Strategy Bot (OpenF1)")
     p.add_argument("--year", type=int, default=2025, help="An analizat (meeting-first).")
     p.add_argument("--meeting-key", type=int, help="Rulează pe meeting-ul dat (Race).")
@@ -770,3 +789,10 @@ if __name__ == "__main__":
                 "minute": str(minute), "pit_loss_base": pit_loss,
                 "suggestion": sug
             }, indent=2, ensure_ascii=False))
+=======
+    p = argparse.ArgumentParser('F1 Strategy Bot (simplified)')
+    p.add_argument('--meeting-key', type=int, required=True)
+    args = p.parse_args()
+    sug = suggest_all_now(args.meeting_key)
+    print(json.dumps({'meeting_key': args.meeting_key, 'suggestions': sug}, indent=2))
+>>>>>>> 35d1832392b417e7f8b4fde0dd2e185ff5bcbd64
