@@ -3,7 +3,7 @@ import laravel from 'laravel-vite-plugin'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const host = env.VITE_DEV_HOST || 'MacBook-Pro-Alexandru.local'
+  const host = env.VITE_DEV_HOST || '127.0.0.1'
   const APP_URL = env.APP_URL || `http://${host}:8000`
   const API_BASE_URL = env.VITE_API_BASE_URL || APP_URL
   return {

@@ -41,7 +41,24 @@ struct StrategySuggestion: Identifiable, Decodable {
 }
 
 struct StrategyResponse: Decodable {
-    let suggestions: [StrategySuggestion]
+    let suggestions: [StrategySuggestion]?
+    let suggestion: StrategySuggestion?
+    let error: String?
+}
+
+func loadStrategy(meeting: Int) async -> [StrategySuggestion] {
+    let url = baseURL.appendingPathComponent("/api/historical/meeting/\(meeting)/strategy")
+    do {
+        let (data, resp) = try await URLSession.shared.data(from: url)
+        let http = resp as! HTTPURLResponse
+        guard (200..<300).contains(http.statusCode) else { return [] }
+        let decoded = try JSONDecoder().decode(StrategyResponse.self, from: data)
+        if let list = decoded.suggestions { return list }
+        if let one = decoded.suggestion { return [one] }
+        return []
+    } catch {
+        return []
+    }
 }
 
 class HistoricalRaceViewModel: ObservableObject {
@@ -127,19 +144,19 @@ class HistoricalRaceViewModel: ObservableObject {
     private func fetchStrategy(meetingKey: Int) {
         log("Fetching strategy", "meeting: \(meetingKey)")
         Task {
-            do {
-                let resp: StrategyResponse = try await getJSON("/api/historical/meeting/\(meetingKey)/strategy")
-                await MainActor.run { self.strategySuggestions = resp.suggestions }
-                log("Strategy bot returned \(resp.suggestions.count) suggestions")
-                for s in resp.suggestions {
+            let list = await loadStrategy(meeting: meetingKey)
+            await MainActor.run { self.strategySuggestions = list }
+            if list.isEmpty {
+                await MainActor.run { self.errorMessage = "Nu pot prelua strategia" }
+                log("Strategy fetch failed", "empty response")
+            } else {
+                log("Strategy bot returned \(list.count) suggestions")
+                for s in list {
                     let name = s.driver_name ?? "?"
                     let advice = s.advice
                     let reason = s.why
                     log("Suggestion for \(name)", "\(advice) – \(reason)")
                 }
-            } catch {
-                log("Strategy fetch failed", String(describing: error))
-                await MainActor.run { self.errorMessage = "Nu pot prelua strategia" }
             }
         }
     }
