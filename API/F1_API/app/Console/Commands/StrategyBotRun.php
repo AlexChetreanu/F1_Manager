@@ -14,7 +14,10 @@ class StrategyBotRun extends Command
     {
         $meetingKey = (int) $this->argument('meeting_key');
         RunStrategyBot::dispatch($meetingKey);
-        $this->info("Strategy bot job dispatched for meeting {$meetingKey}.");
+
+        $python = config('strategy.python_path');
+        $script = config('strategy.script_path', base_path('app/Services/StrategyBot/strategy_bot_openf1.py'));
+        $this->info("Dispatched meeting {$meetingKey} using {$python} -> {$script}");
 
         return self::SUCCESS;
     }

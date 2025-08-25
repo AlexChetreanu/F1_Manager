@@ -40,14 +40,15 @@ def _http_get(endpoint: str, **params):
     except requests.RequestException as e:
         _last_call = time.monotonic()
         if DEBUG:
-            _dbg(f"GET {url} failed: {e}")
+            _dbg(f"GET {endpoint} {params} failed: {e}")
         raise
     _last_call = time.monotonic()
     if DEBUG:
-        _dbg(f"GET {r.url} -> {r.status_code}")
-    if r.status_code >= 400 and DEBUG:
-        _dbg(r.text[:200])
-    r.raise_for_status()
+        _dbg(f"GET {endpoint} {params} -> {r.status_code}")
+    if r.status_code >= 400:
+        if DEBUG:
+            _dbg(r.text[:200])
+        raise SystemExit(f"GET {r.url} -> {r.status_code}")
 
     txt = r.text.strip()
     if txt == "":
@@ -730,7 +731,9 @@ if __name__ == "__main__":
         # meeting-first: ultima cursă din an (fallback pe sessions/year, apoi latest)
         r = None
         meets = meetings_by_year(args.year)
-        if meets.empty or 'date_start' not in meets.columns or meets['date_start'].isna().all():
+        if 'date_start' in meets.columns:
+            meets = meets.dropna(subset=['date_start'])
+        if meets.empty or 'date_start' not in meets.columns:
             sess_year = sessions_by_year(args.year)
             if not sess_year.empty:
                 r = sess_year.sort_values("date_start").tail(1).iloc[0]
