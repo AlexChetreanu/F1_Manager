@@ -1,18 +1,17 @@
 # Strategy Bot Runbook
 
+To avoid `Connection refused` errors on `.local` names or IPv6 addresses, use **only IPv4** endpoints.
+
 ## Pornirea serverului
 
 ```bash
-# IPv4 pe toate interfețele
 php artisan serve --host 0.0.0.0 --port 8000
-# IPv6 (pentru .local care se rezolvă la ::1)
-php artisan serve --host "::" --port 8000
 ```
 
-## Client
+## Client (doar IPv4)
 
-- Simulator iOS: `http://127.0.0.1:8000`
-- iPhone pe LAN: `http://<IP_LAN>:8000`
+- Simulator iOS → `http://127.0.0.1:8000`
+- iPhone pe LAN → `http://<IP_LAN>:8000` (ex: `http://192.168.1.23:8000`)
 
 ## Queue
 

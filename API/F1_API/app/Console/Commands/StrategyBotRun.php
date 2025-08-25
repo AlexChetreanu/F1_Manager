@@ -17,7 +17,8 @@ class StrategyBotRun extends Command
 
         $python = config('strategy.python_path');
         $script = config('strategy.script_path', base_path('app/Services/StrategyBot/strategy_bot_openf1.py'));
-        $this->info("Dispatched meeting {$meetingKey} using {$python} -> {$script}");
+        $base = env('OF1_BASE', 'https://api.openf1.org/v1');
+        $this->info("Dispatched meeting {$meetingKey} using {$python} -> {$script} (OF1_BASE={$base})");
 
         return self::SUCCESS;
     }
