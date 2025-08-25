@@ -14,7 +14,7 @@ except Exception:
     GradientBoostingClassifier = None
 
 # ========================= Config =========================
-BASE = "http://localhost:8000/api/openf1"
+BASE = "https://api.openf1.org/v1"
 UA = {"User-Agent": "F1-StrategyBot/2025", "Accept": "application/json"}
 DEBUG = os.getenv("OF1_DEBUG", "0") == "1"
 
