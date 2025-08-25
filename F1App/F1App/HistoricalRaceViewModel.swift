@@ -109,6 +109,7 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     func startStrategyUpdates(meetingKey: Int) {
+        log("Start strategy updates", "meeting: \(meetingKey)")
         strategyTimer?.invalidate()
         strategyTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
             self.fetchStrategy(meetingKey: meetingKey)
@@ -118,16 +119,26 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     func stopStrategyUpdates() {
+        log("Stop strategy updates")
         strategyTimer?.invalidate()
         strategyTimer = nil
     }
 
     private func fetchStrategy(meetingKey: Int) {
+        log("Fetching strategy", "meeting: \(meetingKey)")
         Task {
             do {
                 let resp: StrategyResponse = try await getJSON("/api/historical/meeting/\(meetingKey)/strategy")
                 await MainActor.run { self.strategySuggestions = resp.suggestions }
+                log("Strategy bot returned \(resp.suggestions.count) suggestions")
+                for s in resp.suggestions {
+                    let name = s.driver_name ?? "?"
+                    let advice = s.advice
+                    let reason = s.why
+                    log("Suggestion for \(name)", "\(advice) – \(reason)")
+                }
             } catch {
+                log("Strategy fetch failed", String(describing: error))
                 await MainActor.run { self.errorMessage = "Nu pot prelua strategia" }
             }
         }
