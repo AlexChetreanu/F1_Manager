@@ -33,6 +33,6 @@ python app/Services/StrategyBot/strategy_bot_openf1.py --meeting-key 1262 --all
 ```bash
 curl -i http://127.0.0.1:8000/api/historical/meeting/1262/strategy
 # 202 {"status":"queued"} la prima lovire (cache miss)
-# 200 cu JSON după ce jobul scrie în cache
+# 200 cu JSON (include 'suggestions') după ce jobul scrie în cache
 ```
 
