@@ -27,7 +27,13 @@ enum API {
 func getJSON<T: Decodable>(_ path: String, query: [String:String]? = nil) async throws -> T {
     let url = API.url(path, query: query)
     let (data, resp) = try await URLSession.shared.data(from: url)
-    guard let http = resp as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+    guard let http = resp as? HTTPURLResponse else {
+        print("\u{1F6AB} Non-HTTP response for", url.absoluteString)
+        throw URLError(.badServerResponse)
+    }
+    guard (200..<300).contains(http.statusCode) else {
+        let body = String(data: data, encoding: .utf8) ?? "<non-UTF8 body>"
+        print("\u{274C} HTTP", http.statusCode, "for", url.absoluteString, "-", body)
         throw URLError(.badServerResponse)
     }
     return try JSONDecoder().decode(T.self, from: data)
