@@ -11,7 +11,8 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('strategy:run', [cache('strategy_active_meeting')])
             ->everyThirtySeconds()
-            ->when(fn () => cache()->has('strategy_active_meeting'));
+            ->when(fn () => cache()->has('strategy_active_meeting'))
+            ->withoutOverlapping();
     }
 
     protected function commands(): void

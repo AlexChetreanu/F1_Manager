@@ -14,7 +14,7 @@ except Exception:
     GradientBoostingClassifier = None
 
 # ========================= Config =========================
-BASE = "https://api.openf1.org/v1"
+BASE = os.getenv("OF1_BASE", "https://api.openf1.org/v1")
 UA = {"User-Agent": "F1-StrategyBot/2025", "Accept": "application/json"}
 DEBUG = os.getenv("OF1_DEBUG", "0") == "1"
 
@@ -35,10 +35,18 @@ def _http_get(endpoint: str, **params):
         time.sleep(wait)
 
     url = f"{BASE}/{endpoint}"
-    r = requests.get(url, params=params, headers=UA, timeout=30)
+    try:
+        r = requests.get(url, params=params, headers=UA, timeout=30)
+    except requests.RequestException as e:
+        _last_call = time.monotonic()
+        if DEBUG:
+            _dbg(f"GET {url} failed: {e}")
+        raise
     _last_call = time.monotonic()
     if DEBUG:
         _dbg(f"GET {r.url} -> {r.status_code}")
+    if r.status_code >= 400 and DEBUG:
+        _dbg(r.text[:200])
     r.raise_for_status()
 
     txt = r.text.strip()
@@ -65,6 +73,30 @@ def _nzint(x, default=0):
 def _coerce_driver_number(df: pd.DataFrame) -> pd.DataFrame:
     if df is not None and not df.empty and "driver_number" in df.columns:
         df["driver_number"] = pd.to_numeric(df["driver_number"], errors="coerce").astype("Int64")
+    return df
+
+def _normalize_sessions(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    df = df.rename(columns={
+        "type": "session_type",
+        "name": "session_name",
+        "start_time": "date_start",
+        "end_time": "date_end",
+        "startDate": "date_start",
+        "endDate": "date_end",
+    })
+    if "session_type" not in df.columns and "session_name" in df.columns:
+        df["session_type"] = df["session_name"]
+    return df
+
+def _normalize_meetings(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    df = df.rename(columns={
+        "start_time": "date_start",
+        "startDate": "date_start",
+    })
     return df
 
 def get_df(endpoint: str, **params) -> pd.DataFrame:
@@ -96,7 +128,7 @@ def meetings_by_year(year: int) -> pd.DataFrame:
             "date_start>=": f"{year}-01-01T00:00:00Z",
             "date_end<=":   f"{year}-12-31T23:59:59Z"
         })
-    return df
+    return _normalize_meetings(df)
 
 def sessions_by_year(year: int) -> pd.DataFrame:
     df = get_df("sessions", year=int(year), session_type="Race")
@@ -106,10 +138,10 @@ def sessions_by_year(year: int) -> pd.DataFrame:
             "date_end<=":   f"{year}-12-31T23:59:59Z",
             "session_type": "Race"
         })
-    return df
+    return _normalize_sessions(df)
 
 def sessions_for_meeting(meeting_key: int) -> pd.DataFrame:
-    return get_df("sessions", meeting_key=int(meeting_key))
+    return _normalize_sessions(get_df("sessions", meeting_key=int(meeting_key)))
 
 def drivers_for_session(session_key: int) -> pd.DataFrame:
     return get_df("drivers", session_key=int(session_key))
@@ -179,12 +211,12 @@ class SessionMeta:
 def iter_year_races(year: int) -> List[SessionMeta]:
     out: List[SessionMeta] = []
     meets = meetings_by_year(year)
-    if meets.empty:
+    if meets.empty or 'date_start' not in meets.columns or meets['date_start'].isna().all():
         _dbg("meetings_by_year empty; trying sessions_by_year")
         sess = sessions_by_year(year)
         if sess.empty:
             _dbg("sessions_by_year empty; trying session_key=latest")
-            latest = get_df("sessions", session_key="latest")
+            latest = _normalize_sessions(get_df("sessions", session_key="latest"))
             if latest.empty:
                 return out
             r = latest.iloc[0]
@@ -673,17 +705,22 @@ if __name__ == "__main__":
     p.add_argument("--poll", type=int, default=12, help="Secunde între rulări în watch (>=9 recomandat).")
     p.add_argument("--summary-year", action="store_true", help="Sinteză pentru toate cursele din an.")
     args, _ = p.parse_known_args()
+    if not args.meeting_key and not args.session_key and not args.summary_year:
+        sys.exit("Specify --meeting-key or --session-key")
 
     # alegem sesiunea
     if args.session_key:
-        sess_df = get_df("sessions", session_key=args.session_key)
-        if sess_df.empty: sys.exit("Sesiune inexistentă.")
+        sess_df = _normalize_sessions(get_df("sessions", session_key=args.session_key))
+        if sess_df.empty:
+            sys.exit("Sesiune inexistentă.")
         r = sess_df.iloc[0]
     elif args.meeting_key:
         sess = sessions_for_meeting(args.meeting_key)
-        if sess.empty: sys.exit("Nu găsesc sesiuni pentru meeting_key.")
-        race = sess[sess["session_type"]=="Race"].sort_values("date_start").tail(1)
-        if race.empty: sys.exit("Nu găsesc sesiune Race pentru meeting-ul dat.")
+        if sess.empty:
+            sys.exit("Nu găsesc sesiuni pentru meeting_key.")
+        race = sess[sess["session_type"] == "Race"].sort_values("date_start").tail(1)
+        if race.empty:
+            sys.exit("Nu găsesc sesiune Race pentru meeting-ul dat.")
         r = race.iloc[0]
     elif args.summary_year:
         df = run_year(args.year)
@@ -693,19 +730,19 @@ if __name__ == "__main__":
         # meeting-first: ultima cursă din an (fallback pe sessions/year, apoi latest)
         r = None
         meets = meetings_by_year(args.year)
-        if meets.empty:
+        if meets.empty or 'date_start' not in meets.columns or meets['date_start'].isna().all():
             sess_year = sessions_by_year(args.year)
             if not sess_year.empty:
                 r = sess_year.sort_values("date_start").tail(1).iloc[0]
             else:
-                latest = get_df("sessions", session_key="latest")
+                latest = _normalize_sessions(get_df("sessions", session_key="latest"))
                 if latest.empty:
                     sys.exit(f"Nu găsesc curse Race în {args.year}.")
                 r = latest.iloc[0]
         else:
             mk = int(meets.sort_values("date_start").iloc[-1]["meeting_key"])
             sess = sessions_for_meeting(mk)
-            race = sess[sess["session_type"]=="Race"].sort_values("date_start").tail(1)
+            race = sess[sess["session_type"] == "Race"].sort_values("date_start").tail(1)
             if race.empty:
                 sys.exit("Nu găsesc sesiune Race pentru meeting-ul selectat.")
             r = race.iloc[0]

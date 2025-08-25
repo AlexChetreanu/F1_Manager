@@ -7,6 +7,11 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Strategy Bot Runbook
+
+For instructions on running the Python strategy bot and verifying the Laravel integration, see [docs/strategy-bot-runbook.md](docs/strategy-bot-runbook.md).
+Use `http://127.0.0.1:8000` when testing from iOS simulators to avoid IPv6 `.local` issues.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
