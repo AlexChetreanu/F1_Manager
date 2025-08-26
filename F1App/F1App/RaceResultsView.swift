@@ -7,7 +7,6 @@ struct SessionResultEntry: Identifiable, Decodable {
 }
 
 private struct MeetingEntry: Decodable { let meeting_key: Int }
-private struct SessionEntry: Decodable { let session_key: Int }
 
 struct RaceResultsView: View {
     let race: Race
@@ -59,36 +58,22 @@ struct RaceResultsView: View {
                 let meetingKey = meetings.last?.meeting_key ?? meetings.first?.meeting_key
             else { return }
 
-            var sessionComps = URLComponents(string: "\(openF1BaseURL)/sessions")!
-            sessionComps.queryItems = [
+            var resultsComps = URLComponents(string: "\(openF1BaseURL)/session_result")!
+            resultsComps.queryItems = [
                 URLQueryItem(name: "meeting_key", value: String(meetingKey)),
-                URLQueryItem(name: "session_name", value: "Race")
+                URLQueryItem(name: "session_name", value: "Race"),
+                URLQueryItem(name: "order_by", value: "position")
             ]
-            guard let sessionURL = sessionComps.url else { return }
+            guard let resultsURL = resultsComps.url else { return }
 
-            URLSession.shared.dataTask(with: sessionURL) { data, _, _ in
+            URLSession.shared.dataTask(with: resultsURL) { data, _, _ in
                 guard
                     let data = data,
-                    let sessions = try? JSONDecoder().decode([SessionEntry].self, from: data),
-                    let sessionKey = sessions.first?.session_key
+                    let response = try? JSONDecoder().decode([SessionResultEntry].self, from: data)
                 else { return }
-
-                var resultsComps = URLComponents(string: "\(openF1BaseURL)/session_result")!
-                resultsComps.queryItems = [
-                    URLQueryItem(name: "session_key", value: String(sessionKey)),
-                    URLQueryItem(name: "order_by", value: "position")
-                ]
-                guard let resultsURL = resultsComps.url else { return }
-
-                URLSession.shared.dataTask(with: resultsURL) { data, _, _ in
-                    guard
-                        let data = data,
-                        let response = try? JSONDecoder().decode([SessionResultEntry].self, from: data)
-                    else { return }
-                    DispatchQueue.main.async { self.results = response }
-                }.resume()
-
+                DispatchQueue.main.async { self.results = response }
             }.resume()
+
         }.resume()
     }
 
