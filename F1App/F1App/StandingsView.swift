@@ -20,7 +20,7 @@ struct StandingsView: View {
                     if selectedTab == "Piloți" {
                         ForEach(standings.sorted(by: { $0.points > $1.points }), id: \.id) { standing in
                             HStack(spacing: 12) {
-                                Image("Images/\(standing.imageName)")
+                                Image.driver(named: standing.imageName)
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 40, height: 40)
