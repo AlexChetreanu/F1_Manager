@@ -32,8 +32,8 @@ struct StandingsView: View {
                                 Image.driver(named: standing.imageName)
                                     .resizable()
                                     .scaledToFill()
-                                    .frame(width: 40, height: 40, alignment: .top)
-                                    .scaleEffect(1.3, anchor: .top)
+                                    .frame(width: 60, height: 60, alignment: .top)
+                                    .scaleEffect(1.5, anchor: .top)
                                     .clipped()
                                     .clipShape(Circle())
                             }
