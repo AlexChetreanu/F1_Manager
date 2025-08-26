@@ -25,78 +25,75 @@ class RunStrategyBot implements ShouldQueue
         $python = config('strategy.python_path');
         $script = config('strategy.script_path', base_path('app/Services/StrategyBot/strategy_bot_openf1.py'));
 
-        if (! is_executable($python)) {
-            Log::error('strategy bot python not executable', ['python' => $python, 'meeting_key' => $this->meetingKey]);
-            Cache::lock("strategy_running_{$this->meetingKey}")->forceRelease();
-            return;
-        }
-
-        if (! file_exists($script)) {
-            Log::error('strategy bot script missing', ['script' => $script, 'meeting_key' => $this->meetingKey]);
-            Cache::lock("strategy_running_{$this->meetingKey}")->forceRelease();
-            return;
-        }
+        $cmd = [
+            $python,
+            $script,
+            '--meeting-key',
+            (string) $this->meetingKey,
+            '--all',
+        ];
 
         $env = [
             'OF1_BASE' => env('OF1_BASE', 'https://api.openf1.org/v1'),
-            'OF1_DEBUG' => '1',
+            'OF1_DEBUG' => '0',
         ];
 
-        $process = new Process([
-            $python,
-            $script,
-            '--meeting-key', (string) $this->meetingKey,
-            '--all',
-        ], base_path(), $env);
-
-        Log::info('running strategy bot', [
-            'meeting_key' => $this->meetingKey,
-            'cmd' => [$python, $script, '--meeting-key', (string) $this->meetingKey, '--all'],
-            'env' => $env,
-        ]);
-
+        $process = new Process($cmd, base_path(), $env);
+        $process->setTimeout(180);
         $process->run();
 
-        $stdout = Str::limit($process->getOutput(), 200);
-        $stderr = Str::limit($process->getErrorOutput(), 200);
-
-        Log::info('strategy bot finished', [
-            'meeting_key' => $this->meetingKey,
-            'stdout' => $stdout,
-            'stderr' => $stderr,
-        ]);
+        $stdout = $process->getOutput();
+        $stderr = $process->getErrorOutput();
 
         if (! $process->isSuccessful()) {
-            Log::error('strategy bot failed', [
-                'meeting_key' => $this->meetingKey,
+            Log::error('Strategy bot failed', [
+                'meeting' => $this->meetingKey,
                 'exit_code' => $process->getExitCode(),
-                'stderr' => $stderr,
+                'stderr' => Str::limit($stderr, 200),
             ]);
-            Cache::lock("strategy_running_{$this->meetingKey}")->forceRelease();
             return;
         }
 
-        try {
-            $data = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
-            if (isset($data['suggestion']) && ! isset($data['suggestions'])) {
-                $data['suggestions'] = $data['suggestion'] ? [$data['suggestion']] : [];
-            }
-            Cache::put(
-                "strategy_suggestions_{$this->meetingKey}",
-                $data,
-                now()->addSeconds(config('strategy.cache_ttl', 600))
-            );
-            $count = is_countable($data['suggestions'] ?? null) ? count($data['suggestions']) : 0;
-            Log::info('strategy bot cached suggestions', ['meeting_key' => $this->meetingKey, 'count' => $count]);
-        } catch (\Throwable $e) {
+        $start = strpos($stdout, '{');
+        $end = strrpos($stdout, '}');
+        if ($start === false || $end === false || $end < $start) {
             Log::error('Invalid JSON from bot', [
-                'meeting_key' => $this->meetingKey,
-                'payload' => $stdout,
-                'exception' => $e->getMessage(),
+                'meeting' => $this->meetingKey,
+                'payload' => Str::limit($stdout, 200),
+                'stderr' => Str::limit($stderr, 200),
             ]);
-        } finally {
-            Cache::lock("strategy_running_{$this->meetingKey}")->forceRelease();
+            return;
         }
+
+        $json = substr($stdout, $start, $end - $start + 1);
+        $data = json_decode($json, true);
+
+        if (! is_array($data)) {
+            Log::error('Invalid JSON from bot', [
+                'meeting' => $this->meetingKey,
+                'payload' => Str::limit($json, 200),
+                'stderr' => Str::limit($stderr, 200),
+            ]);
+            return;
+        }
+
+        if (isset($data['suggestion']) && ! isset($data['suggestions'])) {
+            $data['suggestions'] = $data['suggestion'] ? [$data['suggestion']] : [];
+            unset($data['suggestion']);
+        }
+
+        $data['suggestions'] = $data['suggestions'] ?? [];
+
+        Cache::put(
+            "strategy_suggestions_{$this->meetingKey}",
+            $data,
+            now()->addSeconds(config('strategy.cache_ttl'))
+        );
+
+        Log::info('Strategy cached', [
+            'meeting' => $this->meetingKey,
+            'count' => count($data['suggestions']),
+        ]);
     }
 }
 
