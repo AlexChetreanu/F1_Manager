@@ -43,8 +43,9 @@ struct RaceDetailView: View {
                         ScrollView {
                             LazyVStack(spacing: Layout.Spacing.l) {
                                 ForEach(viewModel.strategySuggestions) { s in
-                                    NavigationLink(destination: StrategyDetailView(suggestion: s)) {
-                                        StrategySuggestionCard(suggestion: s)
+                                    let driver = viewModel.drivers.first { $0.driver_number == s.driver_number }
+                                    NavigationLink(destination: StrategyDetailView(suggestion: s, driver: driver)) {
+                                        StrategySuggestionCard(suggestion: s, driver: driver)
                                     }
                                 }
                             }

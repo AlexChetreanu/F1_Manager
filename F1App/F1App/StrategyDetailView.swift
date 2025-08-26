@@ -2,6 +2,7 @@ import SwiftUI
 
 struct StrategyDetailView: View {
     let suggestion: StrategySuggestion
+    let driver: DriverInfo?
 
     var body: some View {
         ScrollView {
@@ -10,9 +11,10 @@ struct StrategyDetailView: View {
                     DriverRow(
                         position: suggestion.position,
                         driverNumber: suggestion.driver_number,
-                        driverName: suggestion.driver_name ?? "Driver \(suggestion.driver_number ?? 0)",
-                        teamName: suggestion.team ?? "",
-                        trend: nil
+                        driverName: driver?.full_name ?? (suggestion.driver_name ?? "Driver \(suggestion.driver_number ?? 0)"),
+                        teamName: driver?.team_name ?? (suggestion.team ?? ""),
+                        trend: nil,
+                        teamColor: driver?.team_color.map(Color.init(hex:))
                     )
 
                     Text("Advice")
@@ -38,10 +40,16 @@ struct StrategyDetailView: View {
 }
 
 #Preview {
-    StrategyDetailView(suggestion: StrategySuggestion(driver_number: 1,
-                                                     driver_name: "Example Driver",
-                                                     team: "Example Team",
-                                                     position: 1,
-                                                     advice: "Pit now",
-                                                     why: "Fresh tires needed"))
+    StrategyDetailView(
+        suggestion: StrategySuggestion(driver_number: 1,
+                                      driver_name: "Example Driver",
+                                      team: "Example Team",
+                                      position: 1,
+                                      advice: "Pit now",
+                                      why: "Fresh tires needed"),
+        driver: DriverInfo(driver_number: 1,
+                           full_name: "Example Driver",
+                           team_color: "FF0000",
+                           team_name: "Example Team")
+    )
 }

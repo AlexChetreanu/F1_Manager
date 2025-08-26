@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct StrategySuggestionCard: View {
-    @EnvironmentObject var colorStore: TeamColorStore
     let suggestion: StrategySuggestion
+    let driver: DriverInfo?
 
     var body: some View {
         Card {
@@ -10,9 +10,10 @@ struct StrategySuggestionCard: View {
                 DriverRow(
                     position: suggestion.position,
                     driverNumber: suggestion.driver_number,
-                    driverName: suggestion.driver_name ?? "Driver \(suggestion.driver_number ?? 0)",
-                    teamName: suggestion.team ?? "",
-                    trend: nil
+                    driverName: driver?.full_name ?? (suggestion.driver_name ?? "Driver \(suggestion.driver_number ?? 0)"),
+                    teamName: driver?.team_name ?? (suggestion.team ?? ""),
+                    trend: nil,
+                    teamColor: driver?.team_color.map(Color.init(hex:))
                 )
 
                 Text(suggestion.advice)

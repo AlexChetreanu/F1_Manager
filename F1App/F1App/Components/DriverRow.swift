@@ -9,6 +9,7 @@ struct DriverRow: View {
     let driverName: String
     let teamName: String
     let trend: Int?
+    let teamColor: Color?
 
     var body: some View {
         HStack(spacing: Layout.Spacing.m) {
@@ -20,7 +21,7 @@ struct DriverRow: View {
             }
 
             Circle()
-                .fill(colorStore.color(forTeamName: teamName))
+                .fill(teamColor ?? colorStore.color(forTeamName: teamName))
                 .frame(width: 32, height: 32)
                 .overlay(
                     Text(driverNumber.map(String.init) ?? "")
