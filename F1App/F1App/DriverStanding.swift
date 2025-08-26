@@ -18,7 +18,15 @@ struct DriverStanding: Decodable {
 extension DriverStanding {
     /// Returns the resource name for the driver's image based on their last name.
     var imageName: String {
-        name.split(separator: " ").last.map(String.init) ?? name
+        let lastName = name.split(separator: " ").last.map(String.init) ?? name
+        switch lastName.lowercased() {
+        case "russell":
+            return "Russel"
+        case "colapinto":
+            return "Colopinto"
+        default:
+            return lastName.capitalized
+        }
     }
 }
 
