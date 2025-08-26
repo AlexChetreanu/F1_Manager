@@ -19,13 +19,20 @@ struct StandingsView: View {
                 List {
                     if selectedTab == "Piloți" {
                         ForEach(standings.sorted(by: { $0.points > $1.points }), id: \.id) { standing in
-                            VStack(alignment: .leading) {
-                                Text(standing.name)
-                                    .font(.headline)
-                                Text(standing.team)
-                                    .font(.subheadline)
-                                Text("Puncte: \(standing.points)")
-                                    .font(.subheadline)
+                            HStack(spacing: 12) {
+                                Image("Images/\(standing.imageName)")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 40, height: 40)
+                                    .clipShape(Circle())
+                                VStack(alignment: .leading) {
+                                    Text(standing.name)
+                                        .font(.headline)
+                                    Text(standing.team)
+                                        .font(.subheadline)
+                                    Text("Puncte: \(standing.points)")
+                                        .font(.subheadline)
+                                }
                             }
                             .padding(.vertical, 4)
                         }

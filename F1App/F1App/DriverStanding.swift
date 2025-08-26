@@ -15,6 +15,13 @@ struct DriverStanding: Decodable {
         let country_code: String
 }
 
+extension DriverStanding {
+    /// Returns the resource name for the driver's image based on their last name.
+    var imageName: String {
+        name.split(separator: " ").last.map(String.init) ?? name
+    }
+}
+
 func fetchStandings(completion: @escaping ([DriverStanding]?) -> Void) {
     let url = API.url("/api/drivers")
 
