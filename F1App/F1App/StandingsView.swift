@@ -22,8 +22,10 @@ struct StandingsView: View {
                             HStack(spacing: 12) {
                                 Image.driver(named: standing.imageName)
                                     .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 40, height: 40)
+                                    .scaledToFill()
+                                    .frame(width: 40, height: 40, alignment: .top)
+                                    .scaleEffect(1.3, anchor: .top)
+                                    .clipped()
                                     .clipShape(Circle())
                                 VStack(alignment: .leading) {
                                     Text(standing.name)
