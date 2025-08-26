@@ -8,8 +8,12 @@ struct NewsDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 if let url = item.imageUrl {
-                    TopCroppedAsyncImage(url: url)
-                        .accessibilityLabel(item.title)
+                    AsyncImage(url: url) { image in
+                        image.resizable().aspectRatio(contentMode: .fit)
+                    } placeholder: {
+                        Rectangle().fill(Color.gray.opacity(0.3)).aspectRatio(16/9, contentMode: .fit)
+                    }
+                    .accessibilityLabel(item.title)
                 }
 
                 Text(item.title)
