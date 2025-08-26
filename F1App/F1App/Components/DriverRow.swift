@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct DriverRow: View {
+    @Environment(\.colorScheme) private var scheme
     @EnvironmentObject var colorStore: TeamColorStore
+
     let position: Int?
     let driverNumber: Int?
     let driverName: String
@@ -10,25 +12,34 @@ struct DriverRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            if let position = position {
+            if let position {
                 Text("\(position)")
-                    .frame(width: 24)
-                    .foregroundColor(AppColors.textSecondary)
+                    .frame(width: 24, alignment: .trailing)
+                    .foregroundColor(AppColors.textSecondary(scheme))
             }
+
             Circle()
                 .fill(colorStore.color(forTeamName: teamName))
                 .frame(width: 32, height: 32)
-                .overlay(Text(driverNumber.map(String.init) ?? "").foregroundColor(.white))
+                .overlay(
+                    Text(driverNumber.map(String.init) ?? "")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                )
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(driverName)
                     .bodyStyle()
-                    .foregroundColor(AppColors.textPrimary)
+                    .foregroundColor(AppColors.textPrimary(scheme))
+
                 Text(teamName)
                     .captionStyle()
-                    .foregroundColor(AppColors.textSecondary)
+                    .foregroundColor(AppColors.textSecondary(scheme))
             }
+
             Spacer()
-            if let trend = trend {
+
+            if let trend {
                 Image(systemName: trend >= 0 ? "arrow.up" : "arrow.down")
                     .foregroundColor(trend >= 0 ? .green : .red)
             }

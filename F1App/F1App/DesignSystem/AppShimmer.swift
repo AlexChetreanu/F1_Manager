@@ -20,10 +20,16 @@ struct AppShimmer: ViewModifier {
 }
 
 extension View {
+    @ViewBuilder
     func shimmer(_ active: Bool = true) -> some View {
-        modifier(active ? AppShimmer() : SelfModifier())
+        if active {
+            self.modifier(AppShimmer())
+        } else {
+            self
+        }
     }
 }
+
 
 private struct SelfModifier: ViewModifier {
     func body(content: Content) -> some View { content }

@@ -1,22 +1,26 @@
 import SwiftUI
 
 struct QueuedView: View {
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
         VStack(spacing: 8) {
             ProgressView()
             Text("Sugestia este în curs de procesare...")
                 .bodyStyle()
-                .foregroundColor(AppColors.textSecondary)
+                .foregroundColor(AppColors.textSecondary(scheme))
         }
         .padding()
     }
 }
 
 struct EmptyStateView: View {
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
         Text("Nicio sugestie disponibilă")
             .bodyStyle()
-            .foregroundColor(AppColors.textSecondary)
+            .foregroundColor(AppColors.textSecondary(scheme))
             .padding()
     }
 }
