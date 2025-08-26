@@ -28,8 +28,13 @@ private struct ShimmerModifier: ViewModifier {
 }
 
 extension View {
-    func shimmer(active: Bool) -> some View {
-        modifier(active ? ShimmerModifier() : IdentityModifier())
+    @ViewBuilder
+    func shimmer(active: Bool = true) -> some View {
+        if active {
+            self.modifier(ShimmerModifier())
+        } else {
+            self
+        }
     }
 }
 
