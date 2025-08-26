@@ -43,7 +43,7 @@ struct RaceResultsView: View {
     }
 
     private func fetchResults(sessionKey: Int) {
-        var comps = URLComponents(string: "\(API.base)/api/openf1/session_result")!
+        var comps = URLComponents(string: "\(openF1BaseURL)/session_result")!
         comps.queryItems = [
             URLQueryItem(name: "session_key", value: String(sessionKey)),
             URLQueryItem(name: "order_by", value: "position")
