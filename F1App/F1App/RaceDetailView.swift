@@ -14,6 +14,12 @@ struct RaceDetailView: View {
     @State private var selectedTab = 0
     @StateObject private var viewModel = HistoricalRaceViewModel()
 
+    private var raceDate: Date? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: race.date)
+    }
+
     var body: some View {
         VStack {
             Picker("Select Section", selection: $selectedTab) {
@@ -27,9 +33,19 @@ struct RaceDetailView: View {
             Spacer()
             
             if selectedTab == 0 {
-                CircuitView(coordinatesJSON: race.coordinates, viewModel: viewModel)
-                    .frame(height: UIScreen.main.bounds.height / 2)
-                    .padding()
+                if race.date.hasPrefix("2025") && race.status.lowercased() == "finished" {
+                    RaceResultsView(race: race)
+                } else {
+                    VStack {
+                        CircuitView(coordinatesJSON: race.coordinates, viewModel: viewModel)
+                            .frame(height: UIScreen.main.bounds.height / 2)
+                            .padding()
+                        if let d = raceDate {
+                            CountdownView(targetDate: d)
+                                .padding(.bottom)
+                        }
+                    }
+                }
             } else if selectedTab == 1 {
                 List(viewModel.strategySuggestions) { s in
                     NavigationLink(destination: StrategyDetailView(suggestion: s)) {
