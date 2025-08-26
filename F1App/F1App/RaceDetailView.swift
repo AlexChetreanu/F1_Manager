@@ -28,7 +28,7 @@ struct RaceDetailView: View {
 
             if selectedTab == 0 {
                 if race.status.lowercased() == "finished" {
-                    RaceResultsView(viewModel: viewModel)
+                    RaceResultsView(race: race, viewModel: viewModel)
                         .padding()
                 } else {
                     CircuitView(coordinatesJSON: race.coordinates, viewModel: viewModel)
