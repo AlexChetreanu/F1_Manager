@@ -6,6 +6,8 @@ let baseURL = URL(string: "http://127.0.0.1:8000")!
 let baseURL = URL(string: "http://<IP_LAN_MAC>:8000")! // ex. 192.168.1.23
 #endif
 
+let openF1BaseURL = "https://api.openf1.org/v1"
+
 enum API {
     #if targetEnvironment(simulator)
     static let baseURL = URL(string: (ProcessInfo.processInfo.environment["API_BASE"] ?? "http://127.0.0.1:8000"))!
