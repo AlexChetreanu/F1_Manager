@@ -23,13 +23,22 @@ struct RaceDetailView: View {
             }
             .pickerStyle(SegmentedPickerStyle())
             .padding()
-            
+
             Spacer()
-            
+
             if selectedTab == 0 {
-                CircuitView(coordinatesJSON: race.coordinates, viewModel: viewModel)
-                    .frame(height: UIScreen.main.bounds.height / 2)
-                    .padding()
+                if race.status.lowercased() == "finished" {
+                    RaceResultsView(viewModel: viewModel)
+                        .padding()
+                } else {
+                    CircuitView(coordinatesJSON: race.coordinates, viewModel: viewModel)
+                        .frame(height: UIScreen.main.bounds.height / 2)
+                        .padding()
+                    if isUpcomingRace {
+                        CountdownView(dateString: race.date)
+                            .padding()
+                    }
+                }
             } else if selectedTab == 1 {
                 VStack {
                     if let message = viewModel.errorMessage {
@@ -68,5 +77,22 @@ struct RaceDetailView: View {
         .navigationTitle(race.location)
         .navigationBarTitleDisplayMode(.inline)
         .background(AppColors.bg.ignoresSafeArea())
+        .onAppear {
+            viewModel.year = String(race.date.prefix(4))
+            viewModel.load(for: race)
+        }
+    }
+    private var isUpcomingRace: Bool {
+        guard let date = parseRaceDate(race.date) else { return false }
+        return date > Date()
+    }
+    private func parseRaceDate(_ str: String) -> Date? {
+        if let iso = ISO8601DateFormatter().date(from: str) { return iso }
+        let f = DateFormatter()
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        if let d = f.date(from: str) { return d }
+        f.dateFormat = "yyyy-MM-dd"
+        return f.date(from: str)
     }
 }
