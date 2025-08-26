@@ -12,10 +12,15 @@ struct DriversView: View {
         NavigationView {
             VStack {
                 Text("Lista piloților")
-                    .font(.title2)
+                    .titleL()
+                    .foregroundStyle(AppColors.textPri)
                     .padding()
+                Spacer()
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(AppColors.bg)
             .navigationTitle("Piloți")
+            .background(AppColors.bg.ignoresSafeArea())
         }
     }
 }

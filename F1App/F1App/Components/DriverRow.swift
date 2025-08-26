@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct DriverRow: View {
-    @Environment(\.colorScheme) private var scheme
     @EnvironmentObject var colorStore: TeamColorStore
+    @State private var appear = false
 
     let position: Int?
     let driverNumber: Int?
@@ -11,11 +11,12 @@ struct DriverRow: View {
     let trend: Int?
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Layout.Spacing.m) {
             if let position {
                 Text("\(position)")
+                    .captionStyle()
+                    .foregroundStyle(AppColors.textSec)
                     .frame(width: 24, alignment: .trailing)
-                    .foregroundColor(AppColors.textSecondary(scheme))
             }
 
             Circle()
@@ -24,26 +25,32 @@ struct DriverRow: View {
                 .overlay(
                     Text(driverNumber.map(String.init) ?? "")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white)
+                        .foregroundStyle(AppColors.textPri)
                 )
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(driverName)
                     .bodyStyle()
-                    .foregroundColor(AppColors.textPrimary(scheme))
-
+                    .foregroundStyle(AppColors.textPri)
                 Text(teamName)
                     .captionStyle()
-                    .foregroundColor(AppColors.textSecondary(scheme))
+                    .foregroundStyle(AppColors.textSec)
             }
 
             Spacer()
 
             if let trend {
                 Image(systemName: trend >= 0 ? "arrow.up" : "arrow.down")
-                    .foregroundColor(trend >= 0 ? .green : .red)
+                    .foregroundStyle(trend >= 0 ? Color.green : Color.red)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Layout.Spacing.xs)
+        .opacity(appear ? 1 : 0)
+        .offset(y: appear ? 0 : 6)
+        .onAppear {
+            withAnimation(Motion.spring) {
+                appear = true
+            }
+        }
     }
 }

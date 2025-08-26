@@ -1,26 +1,22 @@
 import SwiftUI
 
 struct QueuedView: View {
-    @Environment(\.colorScheme) private var scheme
-
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Layout.Spacing.s) {
             ProgressView()
             Text("Sugestia este în curs de procesare...")
                 .bodyStyle()
-                .foregroundColor(AppColors.textSecondary(scheme))
+                .foregroundStyle(AppColors.textSec)
         }
         .padding()
     }
 }
 
 struct EmptyStateView: View {
-    @Environment(\.colorScheme) private var scheme
-
     var body: some View {
         Text("Nicio sugestie disponibilă")
             .bodyStyle()
-            .foregroundColor(AppColors.textSecondary(scheme))
+            .foregroundStyle(AppColors.textSec)
             .padding()
     }
 }
@@ -33,7 +29,7 @@ struct ErrorBanner: View {
             .foregroundColor(.white)
             .padding()
             .frame(maxWidth: .infinity)
-            .background(AppColors.accentRed)
-            .cornerRadius(8)
+            .background(AppColors.accent)
+            .cornerRadius(Layout.Radius.chip)
     }
 }

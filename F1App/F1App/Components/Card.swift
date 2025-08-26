@@ -1,22 +1,23 @@
 import SwiftUI
 
 struct Card<Content: View>: View {
-    @Environment(\.colorScheme) private var scheme   // ← adăugat
-
     private let content: Content
+
     init(@ViewBuilder content: () -> Content) {
         self.content = content()
     }
 
     var body: some View {
         content
-            .padding()
-            .background(AppColors.surface(scheme))   // ← apelează cu scheme
-            .cornerRadius(20)
+            .padding(Layout.Spacing.l)
+            .background(AppColors.surface)
+            .cornerRadius(Layout.Radius.standard)
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
-                    .stroke(AppColors.stroke(scheme), lineWidth: 1)  // ← apelează cu scheme
+                RoundedRectangle(cornerRadius: Layout.Radius.standard)
+                    .stroke(AppColors.stroke, lineWidth: 1)
             )
-            .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+            .shadow(color: Layout.Shadow.color,
+                    radius: Layout.Shadow.radius,
+                    x: 0, y: Layout.Shadow.y)
     }
 }

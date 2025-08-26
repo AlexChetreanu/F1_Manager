@@ -11,7 +11,11 @@ struct TeamColorsResponse: Codable {
     let teams: [TeamColor]
 }
 
-final class TeamColorService {
+protocol TeamColorProviding {
+    func fetchColors() async throws -> [TeamColor]
+}
+
+final class TeamColorService: TeamColorProviding {
     func fetchColors() async throws -> [TeamColor] {
         let url = API.url("/api/teams/colors")
         let (data, _) = try await URLSession.shared.data(from: url)
