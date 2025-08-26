@@ -20,13 +20,6 @@ struct StandingsView: View {
                     if selectedTab == "Piloți" {
                         ForEach(standings.sorted(by: { $0.points > $1.points }), id: \.id) { standing in
                             HStack(spacing: 12) {
-                                Image.driver(named: standing.imageName)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 40, height: 40, alignment: .top)
-                                    .scaleEffect(1.3, anchor: .top)
-                                    .clipped()
-                                    .clipShape(Circle())
                                 VStack(alignment: .leading) {
                                     Text(standing.name)
                                         .font(.headline)
@@ -35,6 +28,14 @@ struct StandingsView: View {
                                     Text("Puncte: \(standing.points)")
                                         .font(.subheadline)
                                 }
+                                Spacer()
+                                Image.driver(named: standing.imageName)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 40, height: 40, alignment: .top)
+                                    .scaleEffect(1.3, anchor: .top)
+                                    .clipped()
+                                    .clipShape(Circle())
                             }
                             .padding(.vertical, 4)
                         }
