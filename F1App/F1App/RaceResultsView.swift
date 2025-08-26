@@ -3,16 +3,11 @@ import SwiftUI
 struct SessionResultEntry: Identifiable, Decodable {
     let position: Int?
     let driver_number: Int?
+    let session_key: Int?
     var id: Int { driver_number ?? Int.random(in: 1000...9999) }
 }
 
 private struct MeetingEntry: Decodable { let meeting_key: Int }
-
-private struct SessionEntry: Decodable {
-    let session_key: Int
-    let session_name: String?
-    let session_type: String?
-}
 
 struct RaceResultsView: View {
     let race: Race
@@ -64,33 +59,24 @@ struct RaceResultsView: View {
                 let meetingKey = meetings.last?.meeting_key ?? meetings.first?.meeting_key
             else { return }
 
-            var sessionsComps = URLComponents(string: "\(openF1BaseURL)/sessions")!
-            sessionsComps.queryItems = [
-                URLQueryItem(name: "meeting_key", value: String(meetingKey))
+            var resultsComps = URLComponents(string: "\(openF1BaseURL)/session_result")!
+            resultsComps.queryItems = [
+                URLQueryItem(name: "meeting_key", value: String(meetingKey)),
+                URLQueryItem(name: "order_by", value: "position")
             ]
-            guard let sessionsURL = sessionsComps.url else { return }
+            guard let resultsURL = resultsComps.url else { return }
 
-            URLSession.shared.dataTask(with: sessionsURL) { data, _, _ in
+            URLSession.shared.dataTask(with: resultsURL) { data, _, _ in
                 guard
                     let data = data,
-                    let sessions = try? JSONDecoder().decode([SessionEntry].self, from: data),
-                    let raceSession = sessions.first(where: { $0.session_name == "Race" || $0.session_type == "Race" })
+                    var response = try? JSONDecoder().decode([SessionResultEntry].self, from: data)
                 else { return }
 
-                var resultsComps = URLComponents(string: "\(openF1BaseURL)/session_result")!
-                resultsComps.queryItems = [
-                    URLQueryItem(name: "session_key", value: String(raceSession.session_key)),
-                    URLQueryItem(name: "order_by", value: "position")
-                ]
-                guard let resultsURL = resultsComps.url else { return }
+                if let raceSessionKey = response.compactMap({ $0.session_key }).max() {
+                    response = response.filter { $0.session_key == raceSessionKey }
+                }
 
-                URLSession.shared.dataTask(with: resultsURL) { data, _, _ in
-                    guard
-                        let data = data,
-                        let response = try? JSONDecoder().decode([SessionResultEntry].self, from: data)
-                    else { return }
-                    DispatchQueue.main.async { self.results = response }
-                }.resume()
+                DispatchQueue.main.async { self.results = response }
             }.resume()
         }.resume()
     }
