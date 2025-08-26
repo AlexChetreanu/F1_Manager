@@ -6,12 +6,20 @@ struct NewsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let url = item.imageUrl {
-                TopCroppedAsyncImage(url: url)
-                    .accessibilityLabel(item.title)
+                AsyncImage(url: url) { image in
+                    image.resizable()
+                        .aspectRatio(16/9, contentMode: .fill)
+                        .clipped()
+                } placeholder: {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .aspectRatio(16/9, contentMode: .fit)
+                }
+                .accessibilityLabel(item.title)
             } else {
                 Rectangle()
                     .fill(Color.gray.opacity(0.3))
-                    .aspectRatio(16 / (9 * 0.3), contentMode: .fit)
+                    .aspectRatio(16/9, contentMode: .fit)
             }
 
             Text(item.title)
