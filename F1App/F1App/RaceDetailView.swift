@@ -18,7 +18,7 @@ struct RaceDetailView: View {
         VStack {
             Picker("Select Section", selection: $selectedTab) {
                 Text("Circuit").tag(0)
-                Text("Section 2").tag(1)
+                Text("Strategie").tag(1)
                 Text("Curse istorice").tag(2)
             }
             .pickerStyle(SegmentedPickerStyle())
@@ -32,10 +32,12 @@ struct RaceDetailView: View {
                     .padding()
             } else if selectedTab == 1 {
                 List(viewModel.strategySuggestions) { s in
-                    VStack(alignment: .leading) {
-                        Text(s.driver_name ?? "Driver \(s.driver_number ?? 0)").font(.headline)
-                        Text(s.advice).bold()
-                        Text(s.why).font(.caption)
+                    NavigationLink(destination: StrategyDetailView(suggestion: s)) {
+                        VStack(alignment: .leading) {
+                            Text(s.driver_name ?? "Driver \(s.driver_number ?? 0)").font(.headline)
+                            Text(s.advice).bold()
+                            Text(s.why).font(.caption)
+                        }
                     }
                 }
                 .onAppear {
