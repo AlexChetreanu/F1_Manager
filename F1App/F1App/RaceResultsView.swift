@@ -6,11 +6,11 @@ struct SessionResultEntry: Identifiable, Decodable {
     var id: Int { driver_number ?? Int.random(in: 1000...9999) }
 }
 
-struct SessionResultResponse: Decodable {
-    let data: [SessionResultEntry]
-}
+private struct MeetingEntry: Decodable { let meeting_key: Int }
+private struct SessionEntry: Decodable { let session_key: Int }
 
 struct RaceResultsView: View {
+    let race: Race
     @ObservedObject var viewModel: HistoricalRaceViewModel
     @State private var results: [SessionResultEntry] = []
 
@@ -35,24 +35,60 @@ struct RaceResultsView: View {
                 }
             }
         }
-        .onAppear {
-            if results.isEmpty, let sk = viewModel.sessionKey {
-                fetchResults(sessionKey: sk)
-            }
-        }
+        .onAppear { if results.isEmpty { fetchResults() } }
     }
 
-    private func fetchResults(sessionKey: Int) {
-        var comps = URLComponents(string: "\(openF1BaseURL)/session_result")!
-        comps.queryItems = [
-            URLQueryItem(name: "session_key", value: String(sessionKey)),
-            URLQueryItem(name: "order_by", value: "position")
+    private func fetchResults() {
+        guard
+            let circuitId = race.circuit_id,
+            let circuitKey = Int(circuitId),
+            let yearInt = Int(viewModel.year)
+        else { return }
+
+        var meetingComps = URLComponents(string: "\(openF1BaseURL)/meetings")!
+        meetingComps.queryItems = [
+            URLQueryItem(name: "year", value: String(yearInt)),
+            URLQueryItem(name: "circuit_key", value: String(circuitKey))
         ]
-        guard let url = comps.url else { return }
-        URLSession.shared.dataTask(with: url) { data, _, _ in
-            guard let data = data,
-                  let response = try? JSONDecoder().decode(SessionResultResponse.self, from: data) else { return }
-            DispatchQueue.main.async { self.results = response.data }
+        guard let meetingURL = meetingComps.url else { return }
+
+        URLSession.shared.dataTask(with: meetingURL) { data, _, _ in
+            guard
+                let data = data,
+                let meetings = try? JSONDecoder().decode([MeetingEntry].self, from: data),
+                let meetingKey = meetings.last?.meeting_key ?? meetings.first?.meeting_key
+            else { return }
+
+            var sessionComps = URLComponents(string: "\(openF1BaseURL)/sessions")!
+            sessionComps.queryItems = [
+                URLQueryItem(name: "meeting_key", value: String(meetingKey)),
+                URLQueryItem(name: "session_name", value: "Race")
+            ]
+            guard let sessionURL = sessionComps.url else { return }
+
+            URLSession.shared.dataTask(with: sessionURL) { data, _, _ in
+                guard
+                    let data = data,
+                    let sessions = try? JSONDecoder().decode([SessionEntry].self, from: data),
+                    let sessionKey = sessions.first?.session_key
+                else { return }
+
+                var resultsComps = URLComponents(string: "\(openF1BaseURL)/session_result")!
+                resultsComps.queryItems = [
+                    URLQueryItem(name: "session_key", value: String(sessionKey)),
+                    URLQueryItem(name: "order_by", value: "position")
+                ]
+                guard let resultsURL = resultsComps.url else { return }
+
+                URLSession.shared.dataTask(with: resultsURL) { data, _, _ in
+                    guard
+                        let data = data,
+                        let response = try? JSONDecoder().decode([SessionResultEntry].self, from: data)
+                    else { return }
+                    DispatchQueue.main.async { self.results = response }
+                }.resume()
+
+            }.resume()
         }.resume()
     }
 
