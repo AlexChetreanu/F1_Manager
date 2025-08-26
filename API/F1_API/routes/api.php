@@ -13,6 +13,7 @@ use App\Http\Controllers\LiveController;
 use App\Http\Controllers\HistoricalController;
 use App\Http\Controllers\StrategyController;
 use App\Http\Controllers\NewsController;
+use App\Http\Controllers\TeamColorController;
 
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
@@ -50,4 +51,5 @@ Route::prefix('historical')->middleware('throttle:120,1')->group(function () {
 });
 Route::get('/health', fn () => response()->json(['ok' => true]));
 Route::get('/news/f1', [NewsController::class, 'f1Autosport']);
+Route::get('/teams/colors', [TeamColorController::class, 'index']);
 

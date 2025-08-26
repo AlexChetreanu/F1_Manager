@@ -10,6 +10,7 @@ import SwiftUI
 @main
 struct F1AppApp: App {
     @State private var showSplash = true
+    @StateObject private var teamColorStore = TeamColorStore()
 
     var body: some Scene {
         WindowGroup {
@@ -24,6 +25,7 @@ struct F1AppApp: App {
                     .transition(.opacity)
                 }
             }
+            .environmentObject(teamColorStore)
         }
     }
 }

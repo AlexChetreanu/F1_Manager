@@ -31,12 +31,24 @@ struct RaceDetailView: View {
                     .frame(height: UIScreen.main.bounds.height / 2)
                     .padding()
             } else if selectedTab == 1 {
-                List(viewModel.strategySuggestions) { s in
-                    NavigationLink(destination: StrategyDetailView(suggestion: s)) {
-                        VStack(alignment: .leading) {
-                            Text(s.driver_name ?? "Driver \(s.driver_number ?? 0)").font(.headline)
-                            Text(s.advice).bold()
-                            Text(s.why).font(.caption)
+                VStack {
+                    if let message = viewModel.errorMessage {
+                        ErrorBanner(message: message)
+                            .padding()
+                    } else if viewModel.strategySuggestions.isEmpty {
+                        QueuedView()
+                            .shimmer()
+                            .padding()
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 16) {
+                                ForEach(viewModel.strategySuggestions) { s in
+                                    NavigationLink(destination: StrategyDetailView(suggestion: s)) {
+                                        StrategySuggestionCard(suggestion: s)
+                                    }
+                                }
+                            }
+                            .padding()
                         }
                     }
                 }
