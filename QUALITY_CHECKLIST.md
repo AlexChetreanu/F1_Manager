@@ -1,0 +1,8 @@
+- [x] Dynamic colors (Light/Dark)
+- [x] Dynamic Type până la `.accessibility2`
+- [x] Animații folosind `interpolatingSpring(stiffness:220,damping:28)`
+- [x] Shimmer pentru stările de încărcare
+- [x] Haptics soft pentru acțiuni
+- [x] Zero hardcodări de culori de echipă
+- [x] Background-uri folosind `AppColors.bg`
+- [x] Build fără warnings

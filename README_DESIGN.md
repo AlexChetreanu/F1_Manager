@@ -1,34 +1,36 @@
-# Design System & Team Colors
+# Design System
 
-Acest document descrie noile componente vizuale și serviciul de culori pentru aplicația iOS **F1App**.
+## Tokens
+- **AppColors** – `bg`, `surface`, `textPri`, `textSec`, `accent`, `stroke`
+- **AppTypography** – `.titleXL()`, `.titleL()`, `.bodyStyle()`, `.captionStyle()`
+- **Layout** – spacings (`xs=4`, `s=8`, `m=12`, `l=16`, `xl=24`), corner radii and shadow
+- **Shimmer** – `.shimmer(active: Bool)`
+- **Haptics** – `Haptics.soft()`
 
-## TeamColorStore
-- `TeamColorStore` este un `ObservableObject` care încarcă culorile echipelor prin endpoint-ul `/api/teams/colors`.
-- Culorile sunt memorate în `UserDefaults` și pot fi obținute prin:
-  - `color(forTeamId:)`
-  - `color(forTeamName:)`
-  - `color(forDriverNumber:)` (fallback la accent roșu dacă nu există mapare).
-- În `F1AppApp` store-ul este creat cu `@StateObject` și injectat cu `.environmentObject`.
+## Services & Stores
+- `TeamColorService` fetches `/api/teams/colors`
+- `TeamColorStore` caches colors and expune `color(forTeamId:)` / `color(forTeamName:)`
+- Inject `TeamColorStore` in `F1AppApp` and access with `@EnvironmentObject`
 
-## Componente
-- **Card** – container cu fundal `AppColors.surface`, colțuri 20, stroke fin și shadow subtil.
-- **TeamChip** – capsulă colorată după echipă.
-- **DriverRow** – afișează poziția, numărul și numele pilotului cu culoarea echipei.
-- **StrategySuggestionCard** – card care combină `DriverRow` cu detaliile strategiei.
-- **StateViews** – include `QueuedView`, `EmptyStateView` și `ErrorBanner` pentru stări de încărcare/eroare.
+## Components
+- `Card` – container cu padding, stroke și shadow
+- `TeamChip` – capsulă colorată cu animație de tap
+- `DriverRow` – rând pentru pilot
+- `StrategySuggestionCard` – card cu sugestie de strategie
+- `QueuedView`, `EmptyStateView`, `ErrorBanner` – stări standard
 
-## Stiluri
-- Paletă: alb `#FFFFFF`, roșu `#E10600`, negru `#0A0A0A` cu suport Light/Dark.
-- Tipografie: `titleXL`, `titleL`, `bodyStyle`, `captionStyle` (SF Pro).
-- Shimmer: `.shimmer()` pentru stări de încărcare.
-- Animații: `.animation(.interpolatingSpring(stiffness: 220, damping: 28))` pe apariția cardurilor.
-
-## Utilizare
+### Exemplu
 ```swift
 @EnvironmentObject var colorStore: TeamColorStore
 
-StrategySuggestionCard(suggestion: s)
-TeamChip(teamId: s.teamId, teamName: s.team)
-```
+DriverRow(
+    position: 1,
+    driverNumber: 44,
+    driverName: "Lewis Hamilton",
+    teamName: "Mercedes",
+    trend: 1
+)
 
-Culorile sunt obținute din `TeamColorStore`; în lipsă se folosește roșul de accent.
+TeamChip(teamId: 9, teamName: "Ferrari")
+    .onTapGesture { Haptics.soft() }
+```

@@ -37,11 +37,11 @@ struct RaceDetailView: View {
                             .padding()
                     } else if viewModel.strategySuggestions.isEmpty {
                         QueuedView()
-                            .shimmer()
+                            .shimmer(active: true)
                             .padding()
                     } else {
                         ScrollView {
-                            LazyVStack(spacing: 16) {
+                            LazyVStack(spacing: Layout.Spacing.l) {
                                 ForEach(viewModel.strategySuggestions) { s in
                                     NavigationLink(destination: StrategyDetailView(suggestion: s)) {
                                         StrategySuggestionCard(suggestion: s)
@@ -66,5 +66,6 @@ struct RaceDetailView: View {
         }
         .navigationTitle(race.location)
         .navigationBarTitleDisplayMode(.inline)
+        .background(AppColors.bg.ignoresSafeArea())
     }
 }

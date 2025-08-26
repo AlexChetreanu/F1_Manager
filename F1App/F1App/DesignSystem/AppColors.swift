@@ -1,20 +1,36 @@
 import SwiftUI
 
-struct AppColors {
-    static func background(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(hex: "#0A0A0A") : Color(hex: "#FFFFFF")
+enum AppColors {
+    private static func dynamicColor(dark: UIColor, light: UIColor) -> Color {
+        Color(uiColor: UIColor { trait in
+            trait.userInterfaceStyle == .dark ? dark : light
+        })
     }
-    static func surface(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(hex: "#1A1A1A") : Color(hex: "#F5F5F5")
-    }
-    static func textPrimary(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(hex: "#FFFFFF") : Color(hex: "#0A0A0A")
-    }
-    static func textSecondary(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color(hex: "#CCCCCC") : Color(hex: "#555555")
-    }
-    static let accentRed = Color(hex: "#E10600")
-    static func stroke(_ scheme: ColorScheme) -> Color {
-        scheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.1)
-    }
+
+    static let bg = dynamicColor(
+        dark: UIColor(red: 0.039, green: 0.039, blue: 0.039, alpha: 1),
+        light: UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+    )
+
+    static let surface = dynamicColor(
+        dark: UIColor(red: 0.066, green: 0.071, blue: 0.082, alpha: 1),
+        light: UIColor(red: 1, green: 1, blue: 1, alpha: 1)
+    )
+
+    static let textPri = dynamicColor(
+        dark: UIColor(red: 1, green: 1, blue: 1, alpha: 1),
+        light: UIColor(red: 0.039, green: 0.039, blue: 0.039, alpha: 1)
+    )
+
+    static let textSec = dynamicColor(
+        dark: UIColor(red: 0.654, green: 0.671, blue: 0.701, alpha: 1),
+        light: UIColor(red: 0.290, green: 0.290, blue: 0.290, alpha: 1)
+    )
+
+    static let accent = Color(red: 0.882, green: 0.024, blue: 0)
+
+    static let stroke = dynamicColor(
+        dark: UIColor(white: 1, alpha: 0.10),
+        light: UIColor(white: 0, alpha: 0.08)
+    )
 }

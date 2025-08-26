@@ -5,21 +5,34 @@ struct StrategyDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(suggestion.driver_name ?? "Driver \(suggestion.driver_number ?? 0)")
-                    .font(.title)
-                if let team = suggestion.team {
-                    Text("Team: \(team)")
+            Card {
+                VStack(alignment: .leading, spacing: Layout.Spacing.m) {
+                    DriverRow(
+                        position: suggestion.position,
+                        driverNumber: suggestion.driver_number,
+                        driverName: suggestion.driver_name ?? "Driver \(suggestion.driver_number ?? 0)",
+                        teamName: suggestion.team ?? "",
+                        trend: nil
+                    )
+
+                    Text("Advice")
+                        .titleL()
+                        .foregroundStyle(AppColors.textPri)
+                    Text(suggestion.advice)
+                        .bodyStyle()
+                        .foregroundStyle(AppColors.textSec)
+
+                    Text("Why")
+                        .titleL()
+                        .foregroundStyle(AppColors.textPri)
+                    Text(suggestion.why)
+                        .bodyStyle()
+                        .foregroundStyle(AppColors.textSec)
                 }
-                if let position = suggestion.position {
-                    Text("Position: \(position)")
-                }
-                Text("Advice: \(suggestion.advice)")
-                    .bold()
-                Text("Why: \(suggestion.why)")
             }
-            .padding()
+            .padding(Layout.Spacing.l)
         }
+        .background(AppColors.bg.ignoresSafeArea())
         .navigationTitle("Strategie")
     }
 }
