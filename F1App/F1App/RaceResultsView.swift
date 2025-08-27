@@ -15,17 +15,12 @@ struct SessionResultEntry: Identifiable, Decodable {
     let position: Int?
     let driver_number: Int?
     let session_key: Int?
-    let broadcast_name: String?
-    let full_name: String?
     var id: Int { (driver_number ?? Int.random(in: 1000...9999)) ^ (session_key ?? 0) }
-
-    var driverName: String {
-        full_name ?? broadcast_name ?? "-"
-    }
 }
 
 struct RaceResultsView: View {
     let race: Race
+    @ObservedObject var viewModel: HistoricalRaceViewModel
     @State private var results: [SessionResultEntry] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -38,23 +33,14 @@ struct RaceResultsView: View {
                 Text(errorMessage)
                     .foregroundColor(.red)
             } else {
-                PodiumView(entries: Array(results.prefix(3)))
-                ScrollView {
-                    VStack(spacing: 16) {
-                        Divider()
-                        ForEach(results.dropFirst(3)) { entry in
-                            HStack {
-                                Divider()
-                                Text("\(entry.position ?? 0)")
-                                    .frame(width: 24, alignment: .trailing)
-                                driverImage(for: entry)
-                                    .resizable()
-                                    .frame(width: 40, height: 40)
-                                    .clipShape(Circle())
-                                Text(entry.driverName)
-                                Spacer()
-                            }
-                        }
+                PodiumView(entries: Array(results.prefix(3)), viewModel: viewModel)
+                Divider()
+                ForEach(results.dropFirst(3)) { entry in
+                    HStack {
+                        Text("\(entry.position ?? 0)")
+                            .frame(width: 24, alignment: .trailing)
+                        Text(driverName(for: entry.driver_number))
+                        Spacer()
                     }
                 }
             }
@@ -168,8 +154,7 @@ struct RaceResultsView: View {
     private func fetchSessionResults(sessionKey: Int) async throws -> [SessionResultEntry] {
         var comps = URLComponents(string: "\(openF1BaseURL)/session_result")!
         comps.queryItems = [
-            .init(name: "session_key", value: String(sessionKey)),
-            .init(name: "select", value: "position,driver_number,session_key,broadcast_name,full_name")
+            .init(name: "session_key", value: String(sessionKey))
         ]
         let url = comps.url!
         print("🌐 session_result URL:", url.absoluteString)
@@ -217,26 +202,22 @@ struct RaceResultsView: View {
         }
     }
 
-    private func driverImage(for entry: SessionResultEntry) -> Image {
-        guard let last = (entry.full_name ?? entry.broadcast_name)?.split(separator: " ").last else {
-            return Image(systemName: "person.circle")
-        }
-        return Image.driver(named: String(last))
+    private func driverName(for number: Int?) -> String {
+        guard let num = number,
+              let driver = viewModel.drivers.first(where: { $0.driver_number == num }) else { return "-" }
+        return driver.full_name
     }
 }
 
 struct PodiumView: View {
     let entries: [SessionResultEntry]
+    @ObservedObject var viewModel: HistoricalRaceViewModel
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 16) {
             ForEach(entries) { entry in
                 VStack {
-                    driverImage(for: entry)
-                        .resizable()
-                        .frame(width: 60, height: 60)
-                        .clipShape(Circle())
-                    Text(entry.driverName)
+                    Text(driverName(for: entry.driver_number))
                         .font(.caption)
                     Text("\(entry.position ?? 0)")
                         .font(.caption2)
@@ -246,11 +227,10 @@ struct PodiumView: View {
         }
     }
 
-    private func driverImage(for entry: SessionResultEntry) -> Image {
-        guard let last = (entry.full_name ?? entry.broadcast_name)?.split(separator: " ").last else {
-            return Image(systemName: "person.circle")
-        }
-        return Image.driver(named: String(last))
+    private func driverName(for number: Int?) -> String {
+        guard let num = number,
+              let driver = viewModel.drivers.first(where: { $0.driver_number == num }) else { return "-" }
+        return driver.full_name
     }
 }
 
