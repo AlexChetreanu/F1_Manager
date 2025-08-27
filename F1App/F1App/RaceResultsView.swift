@@ -3,22 +3,32 @@ import SwiftUI
 struct SessionResultEntry: Identifiable, Decodable {
     let position: Int?
     let driver_number: Int?
+    let meeting_key: Int?
     let session_key: Int?
-    var id: Int { driver_number ?? Int.random(in: 1000...9999) }
+    let duration: Double?
+    let number_of_laps: Int?
+    let dnf: Bool?
+    let dns: Bool?
+    let dsq: Bool?
+    var id: Int { (driver_number ?? Int.random(in: 1000...9999)) ^ (session_key ?? 0) }
 }
 
 private struct MeetingEntry: Decodable { let meeting_key: Int }
-private struct SessionEntry: Decodable { let session_key: Int }
 
 struct RaceResultsView: View {
     let race: Race
     @ObservedObject var viewModel: HistoricalRaceViewModel
     @State private var results: [SessionResultEntry] = []
+    @State private var isLoading = false
+    @State private var errorMessage: String?
 
     var body: some View {
         VStack(spacing: 16) {
-            if results.isEmpty {
+            if isLoading {
                 Text("Se încarcă rezultatele...")
+            } else if let errorMessage = errorMessage {
+                Text(errorMessage)
+                    .foregroundColor(.red)
             } else {
                 PodiumView(entries: Array(results.prefix(3)), viewModel: viewModel)
                 Divider()
@@ -40,58 +50,79 @@ struct RaceResultsView: View {
     }
 
     private func fetchResults() {
-        guard
-            let circuitId = race.circuit_id,
-            let circuitKey = Int(circuitId),
-            let yearInt = Int(race.date.prefix(4))
-        else { return }
+        isLoading = true
+        errorMessage = nil
+        guard let circuitId = race.circuit_id, let circuitKey = Int(circuitId) else {
+            errorMessage = "Lipsă circuit_key valid pentru căutarea meeting-ului."
+            isLoading = false
+            return
+        }
+        guard let yearInt = Int(race.date.prefix(4)) else {
+            errorMessage = "Dată invalidă pentru cursă."
+            isLoading = false
+            return
+        }
 
+        Task {
+            do {
+                let meetingKey = try await fetchMeetingKey(year: yearInt, circuitKey: circuitKey)
+                let allResults = try await fetchSessionResults(meetingKey: meetingKey)
+                let grouped = Dictionary(grouping: allResults, by: { $0.session_key ?? -1 })
+                let chosen = chooseRaceGroup(from: grouped)
+                let sorted = chosen.sorted { ($0.position ?? Int.max) < ($1.position ?? Int.max) }
+                await MainActor.run {
+                    self.results = sorted
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = "Nu s-au putut încărca rezultatele: \(error.localizedDescription)"
+                    self.isLoading = false
+                }
+            }
+        }
+    }
+
+    private func fetchMeetingKey(year: Int, circuitKey: Int) async throws -> Int {
         var meetingComps = URLComponents(string: "\(openF1BaseURL)/meetings")!
         meetingComps.queryItems = [
-            URLQueryItem(name: "year", value: String(yearInt)),
+            URLQueryItem(name: "year", value: String(year)),
             URLQueryItem(name: "circuit_key", value: String(circuitKey))
         ]
-        guard let meetingURL = meetingComps.url else { return }
+        guard let meetingURL = meetingComps.url else { throw URLError(.badURL) }
+        print("🌐 meetings URL:", meetingURL.absoluteString)
+        let (data, _) = try await URLSession.shared.data(from: meetingURL)
+        let meetings = try JSONDecoder().decode([MeetingEntry].self, from: data)
+        guard let meetingKey = meetings.last?.meeting_key ?? meetings.first?.meeting_key else {
+            throw URLError(.badServerResponse)
+        }
+        return meetingKey
+    }
 
-        URLSession.shared.dataTask(with: meetingURL) { data, _, _ in
-            guard
-                let data = data,
-                let meetings = try? JSONDecoder().decode([MeetingEntry].self, from: data),
-                let meetingKey = meetings.last?.meeting_key ?? meetings.first?.meeting_key
-            else { return }
+    private func fetchSessionResults(meetingKey: Int) async throws -> [SessionResultEntry] {
+        var resultsComps = URLComponents(string: "\(openF1BaseURL)/session_result")!
+        resultsComps.queryItems = [
+            URLQueryItem(name: "meeting_key", value: String(meetingKey)),
+            URLQueryItem(name: "order_by", value: "position")
+        ]
+        guard let resultsURL = resultsComps.url else { throw URLError(.badURL) }
+        print("🌐 session_result URL:", resultsURL.absoluteString)
+        let (data, _) = try await URLSession.shared.data(from: resultsURL)
+        return try JSONDecoder().decode([SessionResultEntry].self, from: data)
+    }
 
-            var sessionComps = URLComponents(string: "\(openF1BaseURL)/sessions")!
-            sessionComps.queryItems = [
-                URLQueryItem(name: "meeting_key", value: String(meetingKey)),
-                URLQueryItem(name: "session_type", value: "Race")
-            ]
-            guard let sessionURL = sessionComps.url else { return }
-
-            URLSession.shared.dataTask(with: sessionURL) { data, _, _ in
-                guard
-                    let data = data,
-                    let sessions = try? JSONDecoder().decode([SessionEntry].self, from: data),
-                    let sessionKey = sessions.last?.session_key ?? sessions.first?.session_key
-                else { return }
-
-                var resultsComps = URLComponents(string: "\(openF1BaseURL)/session_result")!
-                resultsComps.queryItems = [
-                    URLQueryItem(name: "meeting_key", value: String(meetingKey)),
-                    URLQueryItem(name: "session_key", value: String(sessionKey)),
-                    URLQueryItem(name: "order_by", value: "position")
-                ]
-                guard let resultsURL = resultsComps.url else { return }
-
-                URLSession.shared.dataTask(with: resultsURL) { data, _, _ in
-                    guard
-                        let data = data,
-                        let response = try? JSONDecoder().decode([SessionResultEntry].self, from: data)
-                    else { return }
-
-                    DispatchQueue.main.async { self.results = response }
-                }.resume()
-            }.resume()
-        }.resume()
+    private func chooseRaceGroup(from grouped: [Int: [SessionResultEntry]]) -> [SessionResultEntry] {
+        if let byDuration = grouped.max(by: { a, b in
+            (a.value.compactMap { $0.duration }.max() ?? 0) <
+            (b.value.compactMap { $0.duration }.max() ?? 0)
+        }), (byDuration.value.compactMap { $0.duration }.max() ?? 0) > 0 {
+            return byDuration.value
+        }
+        return grouped.max(by: { a, b in
+            let lapsA = a.value.compactMap { $0.number_of_laps }.reduce(0, +)
+            let lapsB = b.value.compactMap { $0.number_of_laps }.reduce(0, +)
+            return lapsA < lapsB
+        })?.value ?? []
     }
 
     private func driverName(for number: Int?) -> String {
@@ -147,4 +178,3 @@ struct PodiumView: View {
         return Image(systemName: "person.circle")
     }
 }
-
