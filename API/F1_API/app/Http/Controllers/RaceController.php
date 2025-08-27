@@ -40,10 +40,14 @@ class RaceController extends Controller
     {
         $now = Carbon::now();
         $raceStart = Carbon::parse($race->date);
+        $raceEnd = $raceStart->copy()->addHours(4);
 
-        if (!in_array(strtolower($race->status), ['finished', 'cancelled']) &&
-            $now->between($raceStart, $raceStart->copy()->addHours(4))) {
-            $race->status = 'In Progress';
+        if (!in_array(strtolower($race->status), ['finished', 'cancelled'])) {
+            if ($now->between($raceStart, $raceEnd)) {
+                $race->status = 'In Progress';
+            } elseif ($now->greaterThan($raceEnd)) {
+                $race->status = 'Finished';
+            }
         }
 
         return $race;

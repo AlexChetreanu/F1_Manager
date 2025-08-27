@@ -42,7 +42,7 @@ struct RaceResultsView: View {
         guard
             let circuitId = race.circuit_id,
             let circuitKey = Int(circuitId),
-            let yearInt = Int(viewModel.year)
+            let yearInt = Int(race.date.prefix(4))
         else { return }
 
         var meetingComps = URLComponents(string: "\(openF1BaseURL)/meetings")!
@@ -62,7 +62,8 @@ struct RaceResultsView: View {
             var resultsComps = URLComponents(string: "\(openF1BaseURL)/session_result")!
             resultsComps.queryItems = [
                 URLQueryItem(name: "meeting_key", value: String(meetingKey)),
-                URLQueryItem(name: "order_by", value: "position")
+                URLQueryItem(name: "order_by", value: "position"),
+                URLQueryItem(name: "session_type", value: "Race")
             ]
             guard let resultsURL = resultsComps.url else { return }
 
