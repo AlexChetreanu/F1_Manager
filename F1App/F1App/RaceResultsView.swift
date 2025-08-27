@@ -48,33 +48,45 @@ struct RaceResultsView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        VStack(spacing: 16) {
-            if isLoading {
-                Text("Se încarcă…")
-            } else if let errorMessage = errorMessage {
-                Text(errorMessage)
-                    .foregroundColor(.red)
-            } else {
-                PodiumView(entries: Array(results.prefix(3)), viewModel: viewModel)
-                Divider()
-                ForEach(results.dropFirst(3)) { entry in
-                    HStack {
-                        Text("\(entry.position ?? 0)")
-                            .frame(width: 24, alignment: .trailing)
-                        Text(driverName(for: entry.driver_number))
-                        Spacer()
-                        if entry.dnf == true {
-                            Text("DNF")
-                                .foregroundColor(.red)
-                        } else {
-                            Text(gapText(for: entry.gap_to_leader))
-                                .foregroundColor(.secondary)
-                                .monospacedDigit()
+        ScrollView {
+            LazyVStack(spacing: 12) {
+                if isLoading {
+                    Text("Se încarcă…")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 8)
+                } else if let errorMessage = errorMessage {
+                    Text(errorMessage)
+                        .foregroundColor(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 8)
+                } else {
+                    PodiumView(entries: Array(results.prefix(3)), viewModel: viewModel)
+                    Divider()
+                    ForEach(results.dropFirst(3)) { entry in
+                        HStack {
+                            Text("\(entry.position ?? 0)")
+                                .frame(width: 24, alignment: .trailing)
+                            Text(driverName(for: entry.driver_number))
+                            Spacer()
+                            if entry.dnf == true {
+                                Text("DNF")
+                                    .foregroundColor(.red)
+                            } else {
+                                Text(gapText(for: entry.gap_to_leader))
+                                    .foregroundColor(.secondary)
+                                    .monospacedDigit()
+                            }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 8)
                     }
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 16)
         }
+        .modifier(BottomInsetCompat())
         .onAppear {
             if results.isEmpty && race.status.lowercased() == "finished" {
                 fetchResults()
@@ -306,6 +318,21 @@ struct PodiumView: View {
             return value == 0 ? "Leader" : String(format: "+%.3f", value)
         case .laps(let laps):
             return laps
+        }
+    }
+}
+
+struct BottomInsetCompat: ViewModifier {
+    @available(iOS 17.0, *)
+    @Environment(\.safeAreaInsets) private var safeInsets
+
+    func body(content: Content) -> some View {
+        if #available(iOS 17.0, *) {
+            content.safeAreaInset(edge: .bottom) {
+                Color.clear.frame(height: max(safeInsets.bottom, 12))
+            }
+        } else {
+            content.padding(.bottom, 24)
         }
     }
 }

@@ -16,20 +16,9 @@ struct RaceDetailView: View {
 
     var body: some View {
         VStack {
-            Picker("Select Section", selection: $selectedTab) {
-                Text("Circuit").tag(0)
-                Text("Strategie").tag(1)
-                Text("Curse istorice").tag(2)
-            }
-            .pickerStyle(SegmentedPickerStyle())
-            .padding()
-
-            Spacer()
-
             if selectedTab == 0 {
                 if race.status.lowercased() == "finished" {
                     RaceResultsView(race: race, viewModel: viewModel)
-                        .padding()
                 } else {
                     CircuitView(coordinatesJSON: race.coordinates, viewModel: viewModel)
                         .frame(height: UIScreen.main.bounds.height / 2)
@@ -71,8 +60,17 @@ struct RaceDetailView: View {
             } else {
                 HistoricalRaceView(race: race, viewModel: viewModel)
             }
-            
-            Spacer()
+        }
+        .safeAreaInset(edge: .top) {
+            Picker("Select Section", selection: $selectedTab) {
+                Text("Circuit").tag(0)
+                Text("Strategie").tag(1)
+                Text("Curse istorice").tag(2)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .background(.ultraThinMaterial)
         }
         .navigationTitle(race.location)
         .navigationBarTitleDisplayMode(.inline)
