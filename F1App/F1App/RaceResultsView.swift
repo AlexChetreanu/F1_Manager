@@ -39,10 +39,6 @@ struct RaceResultsView: View {
                     HStack {
                         Text("\(entry.position ?? 0)")
                             .frame(width: 24, alignment: .trailing)
-                        driverImage(for: entry.driver_number)
-                            .resizable()
-                            .frame(width: 40, height: 40)
-                            .clipShape(Circle())
                         Text(driverName(for: entry.driver_number))
                         Spacer()
                     }
@@ -211,15 +207,6 @@ struct RaceResultsView: View {
               let driver = viewModel.drivers.first(where: { $0.driver_number == num }) else { return "-" }
         return driver.full_name
     }
-
-    private func driverImage(for number: Int?) -> Image {
-        guard let num = number,
-              let driver = viewModel.drivers.first(where: { $0.driver_number == num }) else { return Image(systemName: "person.circle") }
-        if let last = driver.full_name.split(separator: " ").last {
-            return Image.driver(named: String(last))
-        }
-        return Image(systemName: "person.circle")
-    }
 }
 
 struct PodiumView: View {
@@ -230,10 +217,6 @@ struct PodiumView: View {
         HStack(alignment: .bottom, spacing: 16) {
             ForEach(entries) { entry in
                 VStack {
-                    driverImage(for: entry.driver_number)
-                        .resizable()
-                        .frame(width: 60, height: 60)
-                        .clipShape(Circle())
                     Text(driverName(for: entry.driver_number))
                         .font(.caption)
                     Text("\(entry.position ?? 0)")
@@ -248,15 +231,6 @@ struct PodiumView: View {
         guard let num = number,
               let driver = viewModel.drivers.first(where: { $0.driver_number == num }) else { return "-" }
         return driver.full_name
-    }
-
-    private func driverImage(for number: Int?) -> Image {
-        guard let num = number,
-              let driver = viewModel.drivers.first(where: { $0.driver_number == num }) else { return Image(systemName: "person.circle") }
-        if let last = driver.full_name.split(separator: " ").last {
-            return Image.driver(named: String(last))
-        }
-        return Image(systemName: "person.circle")
     }
 }
 
