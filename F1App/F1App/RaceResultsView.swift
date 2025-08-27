@@ -69,12 +69,8 @@ struct RaceResultsView: View {
             URLSession.shared.dataTask(with: resultsURL) { data, _, _ in
                 guard
                     let data = data,
-                    var response = try? JSONDecoder().decode([SessionResultEntry].self, from: data)
+                    let response = try? JSONDecoder().decode([SessionResultEntry].self, from: data)
                 else { return }
-
-                if let raceSessionKey = response.compactMap({ $0.session_key }).max() {
-                    response = response.filter { $0.session_key == raceSessionKey }
-                }
 
                 DispatchQueue.main.async { self.results = response }
             }.resume()
