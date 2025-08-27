@@ -101,8 +101,7 @@ struct RaceResultsView: View {
             var c1 = URLComponents(string: "\(openF1BaseURL)/sessions")!
             c1.queryItems = [
                 .init(name: "meeting_key", value: String(meetingKey)),
-                .init(name: "session_type", value: "Race"),
-                .init(name: "order_by", value: "date_start")
+                .init(name: "session_type", value: "Race")
             ]
             let url1 = c1.url!
             print("🌐 sessions URL (type=Race):", url1.absoluteString)
@@ -117,8 +116,7 @@ struct RaceResultsView: View {
             var c2 = URLComponents(string: "\(openF1BaseURL)/sessions")!
             c2.queryItems = [
                 .init(name: "meeting_key", value: String(meetingKey)),
-                .init(name: "session_type", value: "RACE"),
-                .init(name: "order_by", value: "date_start")
+                .init(name: "session_type", value: "RACE")
             ]
             let url2 = c2.url!
             print("🌐 sessions URL (type=RACE):", url2.absoluteString)
@@ -133,8 +131,7 @@ struct RaceResultsView: View {
             var c3 = URLComponents(string: "\(openF1BaseURL)/sessions")!
             c3.queryItems = [
                 .init(name: "meeting_key", value: String(meetingKey)),
-                .init(name: "session_name", value: "Race"),
-                .init(name: "order_by", value: "date_start")
+                .init(name: "session_name", value: "Race")
             ]
             let url3 = c3.url!
             print("🌐 sessions URL (name=Race):", url3.absoluteString)
@@ -147,8 +144,7 @@ struct RaceResultsView: View {
         // Try 4: fără filtru de tip/nume — ia ultima sesiune a meetingului
         var c4 = URLComponents(string: "\(openF1BaseURL)/sessions")!
         c4.queryItems = [
-            .init(name: "meeting_key", value: String(meetingKey)),
-            .init(name: "order_by", value: "date_start")
+            .init(name: "meeting_key", value: String(meetingKey))
         ]
         let url4 = c4.url!
         print("🌐 sessions URL (no type/name):", url4.absoluteString)
