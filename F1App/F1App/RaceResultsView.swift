@@ -15,6 +15,8 @@ struct SessionResultEntry: Identifiable, Decodable {
     let position: Int?
     let driver_number: Int?
     let session_key: Int?
+    let dnf: Bool?
+    let gap_to_leader: Double?
     var id: Int { (driver_number ?? Int.random(in: 1000...9999)) ^ (session_key ?? 0) }
 }
 
@@ -41,6 +43,14 @@ struct RaceResultsView: View {
                             .frame(width: 24, alignment: .trailing)
                         Text(driverName(for: entry.driver_number))
                         Spacer()
+                        if entry.dnf == true {
+                            Text("DNF")
+                                .foregroundColor(.red)
+                        } else {
+                            Text(gapText(for: entry.gap_to_leader))
+                                .foregroundColor(.secondary)
+                                .monospacedDigit()
+                        }
                     }
                 }
             }
@@ -163,6 +173,18 @@ struct RaceResultsView: View {
         return arr.sorted { ($0.position ?? 9_999) < ($1.position ?? 9_999) }
     }
 
+    private func fetchSessionDrivers(sessionKey: Int) async throws -> [DriverInfo] {
+        var comps = URLComponents(string: "\(openF1BaseURL)/drivers")!
+        comps.queryItems = [
+            .init(name: "session_key", value: String(sessionKey))
+        ]
+        let url = comps.url!
+        print("🌐 drivers URL:", url.absoluteString)
+
+        let arr: [DriverInfo] = try await fetchDecodable(url)
+        return arr
+    }
+
     // MARK: - Orchestrator
 
     private func fetchResults() {
@@ -186,10 +208,14 @@ struct RaceResultsView: View {
                 // 2) session_key (Race, ultimul după date_start)
                 let sk = try await fetchRaceSessionKey(meetingKey: mk)
                 try? await Task.sleep(nanoseconds: 300_000_000)
-                // 3) rezultate după session_key
+                // 3) detalii piloți pentru nume
+                let drivers = try await fetchSessionDrivers(sessionKey: sk)
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                // 4) rezultate după session_key
                 let res = try await fetchSessionResults(sessionKey: sk)
 
                 await MainActor.run {
+                    self.viewModel.drivers = drivers
                     self.results = res
                     self.isLoading = false
                 }
@@ -206,6 +232,12 @@ struct RaceResultsView: View {
         guard let num = number,
               let driver = viewModel.drivers.first(where: { $0.driver_number == num }) else { return "-" }
         return driver.full_name
+    }
+
+    private func gapText(for gap: Double?) -> String {
+        guard let g = gap else { return "-" }
+        if g == 0 { return "Leader" }
+        return String(format: "+%.3f", g)
     }
 }
 
