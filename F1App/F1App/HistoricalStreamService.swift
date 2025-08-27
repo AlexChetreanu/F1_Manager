@@ -77,8 +77,7 @@ final class HistoricalStreamService {
         var comps = URLComponents(url: baseURL.appendingPathComponent("historical/resolve"), resolvingAgainstBaseURL: false)!
         comps.queryItems = [
             URLQueryItem(name: "year", value: String(year)),
-            URLQueryItem(name: "circuit_key", value: String(circuitKey)),
-            URLQueryItem(name: "session_type", value: "Race")
+            URLQueryItem(name: "circuit_key", value: String(circuitKey))
         ]
         let (data, _) = try await URLSession.shared.data(from: comps.url!)
         return try decoder.decode(SessionInfo.self, from: data)

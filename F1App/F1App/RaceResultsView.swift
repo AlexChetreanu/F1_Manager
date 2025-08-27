@@ -6,7 +6,6 @@ struct MeetingEntry: Decodable {
 
 struct SessionEntry: Decodable {
     let session_key: Int
-    let session_type: String
     let session_name: String?
     let date_start: String?
 }
@@ -96,18 +95,23 @@ struct RaceResultsView: View {
         var comps = URLComponents(string: "\(openF1BaseURL)/sessions")!
         comps.queryItems = [
             .init(name: "meeting_key", value: String(meetingKey)),
-            .init(name: "session_type", value: "Race"),
             .init(name: "order_by", value: "date_start")
         ]
         let url = comps.url!
         print("🌐 sessions URL:", url.absoluteString)
 
         let sessions: [SessionEntry] = try await fetchDecodable(url)
-        guard let sk = sessions.last?.session_key ?? sessions.first?.session_key else {
-            throw NSError(domain: "OpenF1", code: -2,
-                          userInfo: [NSLocalizedDescriptionKey: "Nu am găsit sesiunea Race pentru meeting_key \(meetingKey)"])
+
+        // 1) ultima cu nume ce sugerează cursa
+        if let sk = sessions.last(where: { ($0.session_name ?? "").localizedCaseInsensitiveContains("race")
+                                       || ($0.session_name ?? "").localizedCaseInsensitiveContains("grand prix") })?.session_key {
+            return sk
         }
-        return sk
+        // 2) fallback: ultima sesiune
+        if let sk = sessions.last?.session_key { return sk }
+
+        throw NSError(domain: "OpenF1", code: -2,
+                      userInfo: [NSLocalizedDescriptionKey: "Nu am găsit nicio sesiune pentru meeting_key \(meetingKey)"])
     }
 
     private func fetchSessionResults(sessionKey: Int) async throws -> [SessionResultEntry] {
