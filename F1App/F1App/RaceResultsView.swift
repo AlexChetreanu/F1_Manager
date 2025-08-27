@@ -28,7 +28,7 @@ struct RaceResultsView: View {
     var body: some View {
         VStack(spacing: 16) {
             if isLoading {
-                Text("Se încarcă rezultatele…")
+                Text("Se încarcă…")
             } else if let errorMessage = errorMessage {
                 Text(errorMessage)
                     .foregroundColor(.red)
@@ -49,7 +49,11 @@ struct RaceResultsView: View {
                 }
             }
         }
-        .onAppear { if results.isEmpty { fetchResults() } }
+        .onAppear {
+            if results.isEmpty && race.status.lowercased() == "finished" {
+                fetchResults()
+            }
+        }
     }
 
     // MARK: - Network helpers
@@ -60,16 +64,16 @@ struct RaceResultsView: View {
         req.setValue("F1App iOS", forHTTPHeaderField: "User-Agent")
 
         let (data, resp) = try await URLSession.shared.data(for: req)
-        guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
-            let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
+        guard let http = resp as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+        guard http.statusCode == 200 else {
             let head = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
-            throw NSError(domain: "OpenF1", code: code,
-                          userInfo: [NSLocalizedDescriptionKey: "HTTP \(code). Body: \(head)"])
+            throw NSError(domain: "OpenF1", code: http.statusCode,
+                          userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode). Body: \(head)"])
         }
         do { return try JSONDecoder().decode(T.self, from: data) }
         catch {
             let head = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
-            print("⛔️ Decode failed for \(url): \(error)\nBody head: \(head)")
+            print("⛔️ Decode failed for \(url.absoluteString): \(error)\nBody head: \(head)")
             throw error
         }
     }
@@ -92,21 +96,67 @@ struct RaceResultsView: View {
     }
 
     private func fetchRaceSessionKey(meetingKey: Int) async throws -> Int {
-        var comps = URLComponents(string: "\(openF1BaseURL)/sessions")!
-        comps.queryItems = [
+        // Try 1: session_type=Race
+        do {
+            var c1 = URLComponents(string: "\(openF1BaseURL)/sessions")!
+            c1.queryItems = [
+                .init(name: "meeting_key", value: String(meetingKey)),
+                .init(name: "session_type", value: "Race"),
+                .init(name: "order_by", value: "date_start")
+            ]
+            let url1 = c1.url!
+            print("🌐 sessions URL (type=Race):", url1.absoluteString)
+            let s1: [SessionEntry] = try await fetchDecodable(url1)
+            if let sk = s1.last?.session_key { return sk }
+        } catch {
+            print("⚠️ sessions(type=Race) failed: \(error.localizedDescription)")
+        }
+
+        // Try 2: session_type=RACE
+        do {
+            var c2 = URLComponents(string: "\(openF1BaseURL)/sessions")!
+            c2.queryItems = [
+                .init(name: "meeting_key", value: String(meetingKey)),
+                .init(name: "session_type", value: "RACE"),
+                .init(name: "order_by", value: "date_start")
+            ]
+            let url2 = c2.url!
+            print("🌐 sessions URL (type=RACE):", url2.absoluteString)
+            let s2: [SessionEntry] = try await fetchDecodable(url2)
+            if let sk = s2.last?.session_key { return sk }
+        } catch {
+            print("⚠️ sessions(type=RACE) failed: \(error.localizedDescription)")
+        }
+
+        // Try 3: session_name=Race
+        do {
+            var c3 = URLComponents(string: "\(openF1BaseURL)/sessions")!
+            c3.queryItems = [
+                .init(name: "meeting_key", value: String(meetingKey)),
+                .init(name: "session_name", value: "Race"),
+                .init(name: "order_by", value: "date_start")
+            ]
+            let url3 = c3.url!
+            print("🌐 sessions URL (name=Race):", url3.absoluteString)
+            let s3: [SessionEntry] = try await fetchDecodable(url3)
+            if let sk = s3.last?.session_key { return sk }
+        } catch {
+            print("⚠️ sessions(name=Race) failed: \(error.localizedDescription)")
+        }
+
+        // Try 4: fără filtru de tip/nume — ia ultima sesiune a meetingului
+        var c4 = URLComponents(string: "\(openF1BaseURL)/sessions")!
+        c4.queryItems = [
             .init(name: "meeting_key", value: String(meetingKey)),
-            .init(name: "session_type", value: "Race"),
             .init(name: "order_by", value: "date_start")
         ]
-        let url = comps.url!
-        print("🌐 sessions URL:", url.absoluteString)
+        let url4 = c4.url!
+        print("🌐 sessions URL (no type/name):", url4.absoluteString)
+        let s4: [SessionEntry] = try await fetchDecodable(url4)
+        if let sk = s4.last?.session_key { return sk }
 
-        let sessions: [SessionEntry] = try await fetchDecodable(url)
-        guard let sk = sessions.last?.session_key else {
-            throw NSError(domain: "OpenF1", code: -2,
-                          userInfo: [NSLocalizedDescriptionKey: "Nu am găsit sesiunea Race pentru meeting_key \(meetingKey)"])
-        }
-        return sk
+        throw NSError(domain: "OpenF1", code: -2,
+                      userInfo: [NSLocalizedDescriptionKey: "Nu am găsit sesiunea Race pentru meeting_key \(meetingKey)"])
     }
 
     private func fetchSessionResults(sessionKey: Int) async throws -> [SessionResultEntry] {
@@ -154,7 +204,7 @@ struct RaceResultsView: View {
                 }
             } catch {
                 await MainActor.run {
-                    self.errorMessage = "Nu s-au putut încărca rezultatele: \(error.localizedDescription)"
+                    self.errorMessage = error.localizedDescription
                     self.isLoading = false
                 }
             }
