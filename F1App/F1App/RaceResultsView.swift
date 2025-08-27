@@ -6,6 +6,7 @@ struct MeetingEntry: Decodable {
 
 struct SessionEntry: Decodable {
     let session_key: Int
+    let session_type: String
     let session_name: String?
     let date_start: String?
 }
@@ -59,15 +60,14 @@ struct RaceResultsView: View {
         req.setValue("F1App iOS", forHTTPHeaderField: "User-Agent")
 
         let (data, resp) = try await URLSession.shared.data(for: req)
-        guard let http = resp as? HTTPURLResponse else { throw URLError(.badServerResponse) }
-        guard http.statusCode == 200 else {
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? -1
             let head = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
-            throw NSError(domain: "OpenF1", code: http.statusCode,
-                          userInfo: [NSLocalizedDescriptionKey: "HTTP \(http.statusCode). Body: \(head)"])
+            throw NSError(domain: "OpenF1", code: code,
+                          userInfo: [NSLocalizedDescriptionKey: "HTTP \(code). Body: \(head)"])
         }
-        do {
-            return try JSONDecoder().decode(T.self, from: data)
-        } catch {
+        do { return try JSONDecoder().decode(T.self, from: data) }
+        catch {
             let head = String(data: data, encoding: .utf8)?.prefix(200) ?? ""
             print("⛔️ Decode failed for \(url): \(error)\nBody head: \(head)")
             throw error
@@ -95,23 +95,18 @@ struct RaceResultsView: View {
         var comps = URLComponents(string: "\(openF1BaseURL)/sessions")!
         comps.queryItems = [
             .init(name: "meeting_key", value: String(meetingKey)),
+            .init(name: "session_type", value: "Race"),
             .init(name: "order_by", value: "date_start")
         ]
         let url = comps.url!
         print("🌐 sessions URL:", url.absoluteString)
 
         let sessions: [SessionEntry] = try await fetchDecodable(url)
-
-        // 1) ultima cu nume ce sugerează cursa
-        if let sk = sessions.last(where: { ($0.session_name ?? "").localizedCaseInsensitiveContains("race")
-                                       || ($0.session_name ?? "").localizedCaseInsensitiveContains("grand prix") })?.session_key {
-            return sk
+        guard let sk = sessions.last?.session_key else {
+            throw NSError(domain: "OpenF1", code: -2,
+                          userInfo: [NSLocalizedDescriptionKey: "Nu am găsit sesiunea Race pentru meeting_key \(meetingKey)"])
         }
-        // 2) fallback: ultima sesiune
-        if let sk = sessions.last?.session_key { return sk }
-
-        throw NSError(domain: "OpenF1", code: -2,
-                      userInfo: [NSLocalizedDescriptionKey: "Nu am găsit nicio sesiune pentru meeting_key \(meetingKey)"])
+        return sk
     }
 
     private func fetchSessionResults(sessionKey: Int) async throws -> [SessionResultEntry] {
@@ -146,11 +141,11 @@ struct RaceResultsView: View {
 
                 // 1) meeting_key
                 let mk = try await fetchMeetingKey(year: year, circuitKey: circuitKey)
+                try? await Task.sleep(nanoseconds: 300_000_000) // light backoff
                 // 2) session_key (Race, ultimul după date_start)
-                try? await Task.sleep(nanoseconds: 400_000_000)
                 let sk = try await fetchRaceSessionKey(meetingKey: mk)
+                try? await Task.sleep(nanoseconds: 300_000_000)
                 // 3) rezultate după session_key
-                try? await Task.sleep(nanoseconds: 400_000_000)
                 let res = try await fetchSessionResults(sessionKey: sk)
 
                 await MainActor.run {
