@@ -218,8 +218,7 @@ class HistoricalRaceViewModel: ObservableObject {
     private func resolveSession(year: Int, meetingKey: Int?, circuitKey: Int?) {
         var comps = URLComponents(string: "\(API.base)/api/live/resolve")!
         var items = [
-            URLQueryItem(name: "year", value: String(year)),
-            URLQueryItem(name: "session_type", value: "Race")
+            URLQueryItem(name: "year", value: String(year))
         ]
         if let mk = meetingKey {
             items.append(URLQueryItem(name: "meeting_key", value: String(mk)))
@@ -662,8 +661,7 @@ class HistoricalRaceViewModel: ObservableObject {
             comps.queryItems = [
                 URLQueryItem(name: "year", value: String(yearInt)),
                 URLQueryItem(name: "circuit_key", value: String(circuitKey)),
-                URLQueryItem(name: "date", value: String(race.date.prefix(10))),
-                URLQueryItem(name: "session_type", value: "Race")
+                URLQueryItem(name: "date", value: String(race.date.prefix(10)))
             ]
             let resolveURL = comps.url!
             URLSession.shared.dataTask(with: resolveURL) { data, resp, err in
