@@ -158,8 +158,7 @@ struct RaceResultsView: View {
     private func fetchSessionResults(sessionKey: Int) async throws -> [SessionResultEntry] {
         var comps = URLComponents(string: "\(openF1BaseURL)/session_result")!
         comps.queryItems = [
-            .init(name: "session_key", value: String(sessionKey)),
-            .init(name: "order_by", value: "position")
+            .init(name: "session_key", value: String(sessionKey))
         ]
         let url = comps.url!
         print("🌐 session_result URL:", url.absoluteString)
