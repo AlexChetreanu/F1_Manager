@@ -11,12 +11,32 @@ struct SessionEntry: Decodable {
     let date_start: String?
 }
 
+enum GapToLeader: Decodable {
+    case seconds(Double)
+    case laps(String)
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let value = try? container.decode(Double.self) {
+            self = .seconds(value)
+        } else if let str = try? container.decode(String.self) {
+            self = .laps(str)
+        } else {
+            throw DecodingError.typeMismatch(
+                GapToLeader.self,
+                DecodingError.Context(codingPath: decoder.codingPath,
+                                      debugDescription: "Expected Double or String for gap_to_leader")
+            )
+        }
+    }
+}
+
 struct SessionResultEntry: Identifiable, Decodable {
     let position: Int?
     let driver_number: Int?
     let session_key: Int?
     let dnf: Bool?
-    let gap_to_leader: Double?
+    let gap_to_leader: GapToLeader?
     var id: Int { (driver_number ?? Int.random(in: 1000...9999)) ^ (session_key ?? 0) }
 }
 
@@ -234,10 +254,14 @@ struct RaceResultsView: View {
         return driver.full_name
     }
 
-    private func gapText(for gap: Double?) -> String {
-        guard let g = gap else { return "-" }
-        if g == 0 { return "Leader" }
-        return String(format: "+%.3f", g)
+    private func gapText(for gap: GapToLeader?) -> String {
+        guard let gap = gap else { return "-" }
+        switch gap {
+        case .seconds(let value):
+            return value == 0 ? "Leader" : String(format: "+%.3f", value)
+        case .laps(let laps):
+            return laps
+        }
     }
 }
 
@@ -251,6 +275,16 @@ struct PodiumView: View {
                 VStack {
                     Text(driverName(for: entry.driver_number))
                         .font(.caption)
+                    if entry.dnf == true {
+                        Text("DNF")
+                            .foregroundColor(.red)
+                            .font(.caption2)
+                    } else {
+                        Text(gapText(for: entry.gap_to_leader))
+                            .foregroundColor(.secondary)
+                            .font(.caption2)
+                            .monospacedDigit()
+                    }
                     Text("\(entry.position ?? 0)")
                         .font(.caption2)
                 }
@@ -263,6 +297,16 @@ struct PodiumView: View {
         guard let num = number,
               let driver = viewModel.drivers.first(where: { $0.driver_number == num }) else { return "-" }
         return driver.full_name
+    }
+
+    private func gapText(for gap: GapToLeader?) -> String {
+        guard let gap = gap else { return "-" }
+        switch gap {
+        case .seconds(let value):
+            return value == 0 ? "Leader" : String(format: "+%.3f", value)
+        case .laps(let laps):
+            return laps
+        }
     }
 }
 
