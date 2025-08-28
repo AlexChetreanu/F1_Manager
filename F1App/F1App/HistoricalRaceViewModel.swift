@@ -708,7 +708,7 @@ class HistoricalRaceViewModel: ObservableObject {
         )
 
         let healthURL = URL(string: "\(API.base)/api/health")!
-        URLSession.shared.dataTask(with: healthURL) { data, resp, err in
+        URLSession.shared.dataTask(with: healthURL) { (data: Data?, resp: URLResponse?, err: Error?) in
             self.log("GET /api/health", "err=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
 
             guard let yearInt = Int(self.year) else {
@@ -728,11 +728,12 @@ class HistoricalRaceViewModel: ObservableObject {
                 URLQueryItem(name: "circuit_key", value: String(circuitKey))
             ]
             let resolveURL = comps.url!
-            URLSession.shared.dataTask(with: resolveURL) { data, resp, err in
+            URLSession.shared.dataTask(with: resolveURL) { (data: Data?, resp: URLResponse?, err: Error?) in
                 self.log("GET /openf1/sessions (local)", "url=\(resolveURL)\nerr=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
                 guard err == nil,
                       let data = data,
-                      let session = try? JSONDecoder().decode([OpenF1Session].self, from: data).last else {
+                      let env = try? JSONDecoder().decode(Envelope<[SessionDTO]>.self, from: data),
+                      let session = env.data.last else {
                     DispatchQueue.main.async { self.diagnosisSummary = "sessions a eșuat. Vezi log." }
                     return
                 }
@@ -740,13 +741,13 @@ class HistoricalRaceViewModel: ObservableObject {
                 var driversComps = URLComponents(string: "\(API.base)/api/openf1/drivers")!
                 driversComps.queryItems = [URLQueryItem(name: "session_key", value: String(sk)), URLQueryItem(name: "limit", value: "5")]
                 let driversURL = driversComps.url!
-                URLSession.shared.dataTask(with: driversURL) { data, resp, err in
+                URLSession.shared.dataTask(with: driversURL) { (data: Data?, resp: URLResponse?, err: Error?) in
                     self.log("GET /openf1/drivers", "url=\(driversURL)\nerr=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
-                    guard err == nil, let data = data, let dr = try? JSONDecoder().decode([DriverInfo].self, from: data) else {
+                    guard err == nil, let data = data, let drEnv = try? JSONDecoder().decode(Envelope<[DriverInfo]>.self, from: data) else {
                         DispatchQueue.main.async { self.diagnosisSummary = "drivers a eșuat. Vezi log." }
                         return
                     }
-                    let countDrivers = dr.count
+                    let countDrivers = drEnv.data.count
                     var locURLC = URLComponents(string: "\(API.base)/api/openf1/location")!
                     locURLC.queryItems = [
                         URLQueryItem(name: "session_key", value: String(sk)),
@@ -754,11 +755,11 @@ class HistoricalRaceViewModel: ObservableObject {
                         URLQueryItem(name: "limit", value: "1")
                     ]
                     let locURL = locURLC.url!
-                    URLSession.shared.dataTask(with: locURL) { data, resp, err in
+                    URLSession.shared.dataTask(with: locURL) { (data: Data?, resp: URLResponse?, err: Error?) in
                         self.log("GET /openf1/location", "url=\(locURL)\nerr=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
                         var locCount = 0
-                        if let data = data, let lr = try? JSONDecoder().decode([LocationPoint].self, from: data) {
-                            locCount = lr.count
+                        if let data = data, let lrEnv = try? JSONDecoder().decode(Envelope<[LocationPoint]>.self, from: data) {
+                            locCount = lrEnv.data.count
                         }
                         DispatchQueue.main.async {
                             self.diagnosisSummary = "OK sessions (sk=\(sk)), drivers=\(countDrivers), location_first=\(locCount). Vezi log pentru detalii."
