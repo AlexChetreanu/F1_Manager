@@ -3,6 +3,7 @@ import Foundation
 let openF1BaseURL = "https://api.openf1.org/v1"
 
 enum API {
+    static let openF1Base = openF1BaseURL
     #if targetEnvironment(simulator)
     static let baseURL = URL(string: (ProcessInfo.processInfo.environment["API_BASE"] ?? "http://127.0.0.1:8000"))!
     static let historicalBaseURL = URL(string: (ProcessInfo.processInfo.environment["HISTORICAL_API_BASE"] ?? baseURL.absoluteString))!
