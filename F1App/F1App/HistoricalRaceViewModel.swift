@@ -47,7 +47,7 @@ struct StrategyResponse: Decodable {
 }
 
 func loadStrategy(meeting: Int) async -> [StrategySuggestion] {
-    let url = baseURL.appendingPathComponent("/api/historical/meeting/\(meeting)/strategy")
+    let url = API.historicalBaseURL.appendingPathComponent("/api/historical/meeting/\(meeting)/strategy")
     do {
         let (data, resp) = try await URLSession.shared.data(from: url)
         let http = resp as! HTTPURLResponse

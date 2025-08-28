@@ -3,6 +3,7 @@
 ## API Base URL
 
 The mobile app reads its server address from `F1App/Info.plist` (`API_BASE_URL`).
+Historical playback endpoints can override this via `HISTORICAL_API_BASE_URL`; if absent it defaults to `API_BASE_URL`.
 
 - **Simulator:** the default value `http://127.0.0.1:8000` points to a server running on the same machine.
 - **Physical device:** replace `API_BASE_URL` with your computer's IPv4 address on the local network (e.g. `http://192.168.0.10:8000`) so the device can reach the development server.
@@ -39,9 +40,9 @@ The new historical endpoints live under `/api/historical` and expose:
 
 ### iOS client
 
-Open `F1App/F1App.xcodeproj` in Xcode 15+. Ensure `API_BASE_URL` in `Info.plist`
-points to the backend server (see above). The client uses the new
-`HistoricalStreamService` to stream frames and `PlaybackViewModel` to
-control buffering and playback.
+Open `F1App/F1App.xcodeproj` in Xcode 15+. Ensure `API_BASE_URL` (and, if different,
+`HISTORICAL_API_BASE_URL`) in `Info.plist` point to the backend server (see above).
+The client uses the new `HistoricalStreamService` to stream frames and
+`PlaybackViewModel` to control buffering and playback.
 
 Run unit tests with `swift test` or the Xcode test action.

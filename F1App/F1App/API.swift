@@ -1,22 +1,19 @@
 import Foundation
 
-#if targetEnvironment(simulator)
-let baseURL = URL(string: "http://127.0.0.1:8000")!
-#else
-let baseURL = URL(string: "http://<IP_LAN_MAC>:8000")! // ex. 192.168.1.23
-#endif
-
 let openF1BaseURL = "https://api.openf1.org/v1"
 
 enum API {
     #if targetEnvironment(simulator)
     static let baseURL = URL(string: (ProcessInfo.processInfo.environment["API_BASE"] ?? "http://127.0.0.1:8000"))!
+    static let historicalBaseURL = URL(string: (ProcessInfo.processInfo.environment["HISTORICAL_API_BASE"] ?? baseURL.absoluteString))!
     #else
     static let baseURL = URL(string: (ProcessInfo.processInfo.environment["API_BASE"] ?? "http://192.168.X.Y:8000"))! // ← pune IP-ul LAN
+    static let historicalBaseURL = URL(string: (ProcessInfo.processInfo.environment["HISTORICAL_API_BASE"] ?? baseURL.absoluteString))!
     #endif
 
     // ✅ alias ca să nu mai dea "Type 'API' has no member 'base'"
     static var base: String { baseURL.absoluteString }
+    static var historicalBase: String { historicalBaseURL.absoluteString }
 
     static func url(_ path: String, query: [String:String]? = nil) -> URL {
         var comps = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
