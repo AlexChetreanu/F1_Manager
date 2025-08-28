@@ -65,7 +65,7 @@ final class HistoricalStreamService {
     private let baseURL: URL
     private let decoder: JSONDecoder
 
-    init(baseURL: String = API.base) {
+    init(baseURL: String = API.historicalBase) {
         self.baseURL = URL(string: baseURL)!
         let d = JSONDecoder()
         d.dateDecodingStrategy = .iso8601
