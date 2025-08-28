@@ -90,6 +90,7 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var diagnosisSummary: String?
     @Published var currentEventMessage: String?
     @Published var strategySuggestions: [StrategySuggestion] = []
+    @Published var snapshot: LiveSnapshot?
     private var allRaceControlMessages: [RaceEventDTO] = []
     private var allOvertakes: [RaceEventDTO] = []
     private var nextRaceControlIndex = 0
@@ -123,6 +124,7 @@ class HistoricalRaceViewModel: ObservableObject {
     private var locationBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
     private var locationFetchCount = 0
     private var strategyTimer: Timer?
+    private let snapshotService = HistoricalSnapshotService()
 
     private func log(_ title: String, _ detail: String = "") {
         guard debugEnabled else { return }
@@ -769,5 +771,29 @@ class HistoricalRaceViewModel: ObservableObject {
         }.resume()
     }
 
+    func loadSnapshot(forYear year: Int) {
+        snapshotService.fetchSnapshot(year: year) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let snap):
+                    self.snapshot = snap
+                    self.drivers = snap.drivers.map {
+                        DriverInfo(driver_number: $0.driver_number,
+                                   full_name: $0.name,
+                                   team_color: $0.team_colour,
+                                   team_name: $0.team_name)
+                    }
+                    self.currentPosition = Dictionary(uniqueKeysWithValues: snap.drivers.compactMap { state in
+                        guard let loc = state.location else { return nil }
+                        let lp = LocationPoint(driver_number: state.driver_number, date: snap.ts ?? "", x: loc.x ?? 0, y: loc.y ?? 0)
+                        return (state.driver_number, lp)
+                    })
+                    self.errorMessage = nil
+                case .failure(let err):
+                    self.errorMessage = err.localizedDescription
+                }
+            }
+        }
+    }
 }
 
