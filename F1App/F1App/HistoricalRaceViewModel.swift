@@ -216,7 +216,7 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func resolveSession(year: Int, meetingKey: Int?, circuitKey: Int?) {
-        var comps = URLComponents(string: "\(API.base)/api/live/resolve")!
+        var comps = URLComponents(string: "\(API.base)/api/historical/resolve")!
         var items = [
             URLQueryItem(name: "year", value: String(year))
         ]
@@ -229,7 +229,7 @@ class HistoricalRaceViewModel: ObservableObject {
 
         let url = comps.url!
         URLSession.shared.dataTask(with: url) { data, resp, error in
-            self.log("GET /live/resolve", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+            self.log("GET /historical/resolve", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
             if let http = resp as? HTTPURLResponse, http.statusCode != 200 {
                 let body = String(data: data ?? Data(), encoding: .utf8) ?? ""
                 DispatchQueue.main.async { self.errorMessage = "Resolve \(http.statusCode): \(body)" }
@@ -277,19 +277,17 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func fetchDrivers(sessionKey: Int) {
-        var comps = URLComponents(string: "\(openF1BaseURL)/drivers")!
-        comps.queryItems = [URLQueryItem(name: "session_key", value: String(sessionKey))]
-        guard let url = comps.url else { return }
+        let url = URL(string: "\(API.base)/api/historical/session/\(sessionKey)/drivers")!
         URLSession.shared.dataTask(with: url) { data, resp, error in
-            self.log("GET /openf1/drivers", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+            self.log("GET /historical/drivers", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
             if let error = error {
                 DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /drivers: \(error.localizedDescription)" }
                 return
             }
             guard let data = data else { return }
             do {
-                let response = try JSONDecoder().decode(DriversResponse.self, from: data)
-                let uniqueDrivers = Array(Set(response.data))
+                let response = try JSONDecoder().decode([DriverInfo].self, from: data)
+                let uniqueDrivers = Array(Set(response))
                 DispatchQueue.main.async {
                     self.drivers = uniqueDrivers
                     self.fetchLocations(sessionKey: sessionKey)
@@ -657,7 +655,7 @@ class HistoricalRaceViewModel: ObservableObject {
                 return
             }
 
-            var comps = URLComponents(string: "\(API.base)/api/live/resolve")!
+            var comps = URLComponents(string: "\(API.base)/api/historical/resolve")!
             comps.queryItems = [
                 URLQueryItem(name: "year", value: String(yearInt)),
                 URLQueryItem(name: "circuit_key", value: String(circuitKey)),
@@ -665,7 +663,7 @@ class HistoricalRaceViewModel: ObservableObject {
             ]
             let resolveURL = comps.url!
             URLSession.shared.dataTask(with: resolveURL) { data, resp, err in
-                self.log("GET /live/resolve", "url=\(resolveURL)\nerr=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+                self.log("GET /historical/resolve", "url=\(resolveURL)\nerr=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
                 guard err == nil, let data = data, let session = try? JSONDecoder().decode(ResolveResponse.self, from: data) else {
                     DispatchQueue.main.async { self.diagnosisSummary = "resolve a eșuat. Vezi log." }
                     return
