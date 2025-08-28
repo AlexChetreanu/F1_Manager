@@ -2,6 +2,9 @@ import Foundation
 
 struct OpenF1Session: Decodable {
     let session_key: Int
+    let meeting_key: Int?
+    let date_start: String?
+    let date_end: String?
 }
 
 struct LiveSnapshot: Decodable {
@@ -33,7 +36,7 @@ struct LiveSnapshot: Decodable {
 
 class HistoricalSnapshotService {
     func fetchSnapshot(year: Int, completion: @escaping (Result<LiveSnapshot, Error>) -> Void) {
-        guard let sessionsURL = URL(string: "\(openF1BaseURL)/sessions?year=\(year)&session_type=Race&limit=1") else {
+        guard let sessionsURL = URL(string: "\(API.base)/api/openf1/sessions?year=\(year)&session_type=Race&limit=1") else {
             completion(.failure(URLError(.badURL)))
             return
         }
@@ -48,7 +51,7 @@ class HistoricalSnapshotService {
                 return
             }
             let sessionKey = session.session_key
-            guard let snapshotURL = URL(string: "\(openF1BaseURL)/live/snapshot?session_key=\(sessionKey)") else {
+            guard let snapshotURL = URL(string: "\(API.base)/api/live/snapshot?session_key=\(sessionKey)") else {
                 completion(.failure(URLError(.badURL)))
                 return
             }
