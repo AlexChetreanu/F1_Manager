@@ -1,12 +1,5 @@
 import Foundation
 
-struct OpenF1Session: Decodable {
-    let session_key: Int
-    let meeting_key: Int?
-    let date_start: String?
-    let date_end: String?
-}
-
 struct LiveSnapshot: Decodable {
     struct DriverState: Decodable {
         struct Position: Decodable {
@@ -46,7 +39,7 @@ class HistoricalSnapshotService {
                 return
             }
             guard let data = data,
-                  let session = try? JSONDecoder().decode([OpenF1Session].self, from: data).first else {
+                  let session = try? JSONDecoder().decode(Envelope<[SessionDTO]>.self, from: data).data.last else {
                 completion(.failure(URLError(.badServerResponse)))
                 return
             }
