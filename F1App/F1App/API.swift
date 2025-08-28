@@ -14,6 +14,7 @@ enum API {
     // ✅ alias ca să nu mai dea "Type 'API' has no member 'base'"
     static var base: String { baseURL.absoluteString }
     static var historicalBase: String { historicalBaseURL.absoluteString }
+    static var openF1Base: String { openF1BaseURL }
 
     static func url(_ path: String, query: [String:String]? = nil) -> URL {
         var comps = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!
