@@ -766,7 +766,7 @@ class HistoricalRaceViewModel: ObservableObject {
                     }.resume()
                 }.resume()
             }.resume()
-        }.resume()
+        }//.resume()
     }
 
     func loadSnapshot(forYear year: Int) {
