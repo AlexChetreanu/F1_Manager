@@ -81,6 +81,8 @@ class HistoricalRaceViewModel: ObservableObject {
     @Published var trackPoints: [CGPoint] = []
     @Published var sessionKey: Int?
     @Published var meetingKey: Int?
+    @Published var sessionStart: String?
+    @Published var sessionEnd: String?
     @Published var stepIndex: Int = 0
     @Published var playbackSpeed: Double = 1.0
     @Published var currentStepDuration: Double = 1.0
@@ -93,7 +95,6 @@ class HistoricalRaceViewModel: ObservableObject {
     private var nextRaceControlIndex = 0
     private var nextOvertakeIndex = 0
     private var sessionStartDate: Date?
-    private var sessionEndDate: Date?
     private struct ActiveToast: Identifiable {
         let id: Int64
         let event: RaceEventDTO
@@ -224,18 +225,6 @@ class HistoricalRaceViewModel: ObservableObject {
         let date_end: String?
     }
 
-    private func fetchSessionInfo(sessionKey: Int) async throws -> (start: Date?, end: Date?) {
-        var comps = URLComponents(string: "\(API.openF1Base)/sessions")!
-        comps.queryItems = [ .init(name: "session_key", value: String(sessionKey)) ]
-        let (data, resp) = try await URLSession.shared.data(from: comps.url!)
-        guard (resp as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-        struct S: Decodable { let date_start: String?; let date_end: String? }
-        let info = try JSONDecoder().decode([S].self, from: data).first
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return (info?.date_start.flatMap { f.date(from: $0) }, info?.date_end.flatMap { f.date(from: $0) })
-    }
-
     private func resolveSession(year: Int, meetingKey: Int?, circuitKey: Int?) {
         var comps = URLComponents(string: "\(API.base)/api/live/resolve")!
         var items = [
@@ -268,24 +257,18 @@ class HistoricalRaceViewModel: ObservableObject {
             DispatchQueue.main.async {
                 self.sessionKey = session.session_key
                 self.meetingKey = session.meeting_key
+                self.sessionStart = session.date_start
+                if let ds = session.date_start {
+                    self.sessionStartDate = self.backendFormatter.date(from: ds)
+                } else {
+                    self.sessionStartDate = nil
+                }
+                self.sessionEnd = session.date_end
                 self.errorMessage = nil
-                Task {
-                    do {
-                        let (start, end) = try await self.fetchSessionInfo(sessionKey: session.session_key)
-                        await MainActor.run {
-                            self.sessionStartDate = start
-                            if let e = end ?? start?.addingTimeInterval(4 * 60 * 60) {
-                                self.sessionEndDate = e
-                            }
-                            self.fetchDrivers(sessionKey: session.session_key)
-                            if self.sessionStartDate != nil {
-                                self.fetchRaceControl(sessionKey: session.session_key)
-                                self.fetchOvertakes(sessionKey: session.session_key)
-                            }
-                        }
-                    } catch {
-                        await MainActor.run { self.errorMessage = "Nu pot prelua info sesiune" }
-                    }
+                self.fetchDrivers(sessionKey: session.session_key)
+                if self.sessionStartDate != nil {
+                    self.fetchRaceControl(sessionKey: session.session_key)
+                    self.fetchOvertakes(sessionKey: session.session_key)
                 }
             }
         }.resume()
@@ -433,15 +416,17 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func fetchLocations(sessionKey: Int) {
-        let margin: TimeInterval = 120
-        let defaultStart = Date()
-        let startBase = sessionStartDate ?? defaultStart
-        let endBase = sessionEndDate ?? sessionStartDate?.addingTimeInterval(4 * 60 * 60) ?? defaultStart.addingTimeInterval(4 * 60 * 60)
-        let start = startBase.addingTimeInterval(-margin)
-        let end = endBase.addingTimeInterval(margin)
-        let iso = ISO8601DateFormatter(); iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let startStr = iso.string(from: start)
-        let endStr = iso.string(from: end)
+        guard let startString = sessionStart,
+              let start = backendFormatter.date(from: startString) else { return }
+        let end: Date
+        if let endString = sessionEnd,
+           let endDate = backendFormatter.date(from: endString) {
+            end = endDate
+        } else {
+            end = start.addingTimeInterval(3 * 60 * 60)
+        }
+        let startStr = dateFormatter.string(from: start)
+        let endStr = dateFormatter.string(from: end)
         locationFetchCount = 0
 
         for driver in drivers {
@@ -450,8 +435,7 @@ class HistoricalRaceViewModel: ObservableObject {
                                  startStr: startStr,
                                  endStr: endStr,
                                  offset: 0,
-                                 accumulated: [],
-                                 retry429: 0)
+                                 accumulated: [])
         }
 
         func fetchDriverLocations(driver: DriverInfo,
@@ -459,14 +443,13 @@ class HistoricalRaceViewModel: ObservableObject {
                                   startStr: String,
                                   endStr: String,
                                   offset: Int,
-                                  accumulated: [LocationPoint],
-                                  retry429: Int) {
+                                  accumulated: [LocationPoint]) {
             var comps = URLComponents(string: "\(openF1BaseURL)/location")!
             comps.queryItems = [
                 URLQueryItem(name: "session_key", value: String(sessionKey)),
                 URLQueryItem(name: "driver_number", value: String(driver.driver_number)),
-                URLQueryItem(name: "date__gte", value: startStr),
-                URLQueryItem(name: "date__lte", value: endStr),
+                URLQueryItem(name: "date__gt", value: startStr),
+                URLQueryItem(name: "date__lt", value: endStr),
                 URLQueryItem(name: "order_by", value: "date"),
                 URLQueryItem(name: "limit", value: "1000"),
                 URLQueryItem(name: "offset", value: String(offset))
@@ -488,20 +471,18 @@ class HistoricalRaceViewModel: ObservableObject {
                     }
                     guard http.statusCode == 200 else {
                         if http.statusCode == 429 {
-                            let delay = min(1.0, 0.5 * pow(2.0, Double(retry429)))
                             self.log("HTTP 429 /location", self.previewBody(data))
-                            DispatchQueue.global().asyncAfter(deadline: .now() + delay) {
+                            DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
                                 fetchDriverLocations(driver: driver,
                                                      sessionKey: sessionKey,
                                                      startStr: startStr,
                                                      endStr: endStr,
                                                      offset: offset,
-                                                     accumulated: accumulated,
-                                                     retry429: retry429 + 1)
+                                                     accumulated: accumulated)
                             }
                         } else {
                             self.log("HTTP \(http.statusCode) /location", self.previewBody(data))
-                            DispatchQueue.main.async { self.errorMessage = "Eroare /location: cod \(http.statusCode)"; self.driverFetchCompleted() }
+                            DispatchQueue.main.async { self.driverFetchCompleted() }
                         }
                         return
                     }
@@ -511,50 +492,6 @@ class HistoricalRaceViewModel: ObservableObject {
                     }
                     do {
                         let response = try JSONDecoder().decode([LocationPoint].self, from: data)
-                        if response.isEmpty && offset == 0 {
-                            Task {
-                                var probe = URLComponents(string: "\(API.openF1Base)/location")!
-                                probe.queryItems = [
-                                    .init(name: "session_key", value: String(sessionKey)),
-                                    .init(name: "limit", value: "1"),
-                                    .init(name: "order_by", value: "date")
-                                ]
-                                do {
-                                    let (pData, pResp) = try await URLSession.shared.data(from: probe.url!)
-                                    if (pResp as? HTTPURLResponse)?.statusCode == 200,
-                                       let arr = try? JSONSerialization.jsonObject(with: pData) as? [Any], arr.isEmpty {
-                                        await MainActor.run {
-                                            self.errorMessage = "Nu există date location pentru această sesiune."
-                                            self.driverFetchCompleted()
-                                        }
-                                    } else {
-                                        await MainActor.run {
-                                            self.errorMessage = "Fereastra de timp ajustată; reîncerc."
-                                        }
-                                        let bigMargin: TimeInterval = 600
-                                        let start = (self.sessionStartDate ?? Date()).addingTimeInterval(-bigMargin)
-                                        let endBase = self.sessionEndDate ?? (self.sessionStartDate ?? Date()).addingTimeInterval(4 * 60 * 60)
-                                        let end = endBase.addingTimeInterval(bigMargin)
-                                        let iso = ISO8601DateFormatter(); iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                                        let s2 = iso.string(from: start)
-                                        let e2 = iso.string(from: end)
-                                        fetchDriverLocations(driver: driver,
-                                                             sessionKey: sessionKey,
-                                                             startStr: s2,
-                                                             endStr: e2,
-                                                             offset: 0,
-                                                             accumulated: [],
-                                                             retry429: 0)
-                                    }
-                                } catch {
-                                    await MainActor.run {
-                                        self.errorMessage = "Eroare rețea la /location probe: \(error.localizedDescription)"
-                                        self.driverFetchCompleted()
-                                    }
-                                }
-                            }
-                            return
-                        }
                         let converted = response.map { lp -> LocationPoint in
                             var isoDate = lp.date
                             if let d = self.backendFormatter.date(from: lp.date) {
@@ -569,11 +506,9 @@ class HistoricalRaceViewModel: ObservableObject {
                                                  startStr: startStr,
                                                  endStr: endStr,
                                                  offset: offset + 1000,
-                                                 accumulated: newAccum,
-                                                 retry429: 0)
+                                                 accumulated: newAccum)
                         } else {
                             DispatchQueue.main.async {
-                                if self.errorMessage == "Fereastra de timp ajustată; reîncerc." { self.errorMessage = nil }
                                 var processed = newAccum
                                 if newAccum.count > 2,
                                    let startDate = self.dateFormatter.date(from: newAccum[0].date) {
