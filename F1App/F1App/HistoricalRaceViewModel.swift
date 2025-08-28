@@ -264,18 +264,6 @@ class HistoricalRaceViewModel: ObservableObject {
         }.resume()
     }
 
-    private struct DriversResponse: Decodable {
-        let data: [DriverInfo]
-    }
-
-    private struct LocationsResponse: Decodable {
-        let data: [LocationPoint]
-    }
-
-    private struct EventsResponse: Decodable {
-        let data: [RaceEventDTO]
-    }
-
     private func fetchDrivers(sessionKey: Int) {
         var comps = URLComponents(string: "\(openF1BaseURL)/drivers")!
         comps.queryItems = [URLQueryItem(name: "session_key", value: String(sessionKey))]
@@ -288,8 +276,8 @@ class HistoricalRaceViewModel: ObservableObject {
             }
             guard let data = data else { return }
             do {
-                let response = try JSONDecoder().decode(DriversResponse.self, from: data)
-                let uniqueDrivers = Array(Set(response.data))
+                let response = try JSONDecoder().decode([DriverInfo].self, from: data)
+                let uniqueDrivers = Array(Set(response))
                 DispatchQueue.main.async {
                     self.drivers = uniqueDrivers
                     self.fetchLocations(sessionKey: sessionKey)
@@ -314,14 +302,14 @@ class HistoricalRaceViewModel: ObservableObject {
             do {
                 let decoder = JSONDecoder()
                 decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let response = try decoder.decode(EventsResponse.self, from: data)
+                let response = try decoder.decode([RaceEventDTO].self, from: data)
                 let sorted: [RaceEventDTO]
                 if let start = self.sessionStartDate {
-                    sorted = response.data.sorted {
+                    sorted = response.sorted {
                         (eventTimeMs($0, sessionStart: start) ?? .max) < (eventTimeMs($1, sessionStart: start) ?? .max)
                     }
                 } else {
-                    sorted = response.data.sorted {
+                    sorted = response.sorted {
                         ($0.dateIso ?? $0.date ?? "") < ($1.dateIso ?? $1.date ?? "")
                     }
                 }
@@ -350,14 +338,14 @@ class HistoricalRaceViewModel: ObservableObject {
             do {
                 let decoder = JSONDecoder()
                 decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let response = try decoder.decode(EventsResponse.self, from: data)
+                let response = try decoder.decode([RaceEventDTO].self, from: data)
                 let sorted: [RaceEventDTO]
                 if let start = self.sessionStartDate {
-                    sorted = response.data.sorted {
+                    sorted = response.sorted {
                         (eventTimeMs($0, sessionStart: start) ?? .max) < (eventTimeMs($1, sessionStart: start) ?? .max)
                     }
                 } else {
-                    sorted = response.data.sorted {
+                    sorted = response.sorted {
                         ($0.dateIso ?? $0.date ?? "") < ($1.dateIso ?? $1.date ?? "")
                     }
                 }
@@ -426,8 +414,8 @@ class HistoricalRaceViewModel: ObservableObject {
                     return
                 }
                 do {
-                    let response = try JSONDecoder().decode(LocationsResponse.self, from: data)
-                    let converted = response.data.map { lp -> LocationPoint in
+                    let response = try JSONDecoder().decode([LocationPoint].self, from: data)
+                    let converted = response.map { lp -> LocationPoint in
                         var isoDate = lp.date
                         if let d = self.backendFormatter.date(from: lp.date) {
                             isoDate = self.dateFormatter.string(from: d)
@@ -435,7 +423,7 @@ class HistoricalRaceViewModel: ObservableObject {
                         return LocationPoint(driver_number: lp.driver_number, date: isoDate, x: lp.x, y: lp.y)
                     }
                     let newAccum = accumulated + converted
-                    if response.data.count == 1000 {
+                    if response.count == 1000 {
                         fetchDriverLocations(driver: driver,
                                              sessionKey: sessionKey,
                                              startStr: startStr,
@@ -676,11 +664,11 @@ class HistoricalRaceViewModel: ObservableObject {
                 let driversURL = driversComps.url!
                 URLSession.shared.dataTask(with: driversURL) { data, resp, err in
                     self.log("GET /openf1/drivers", "url=\(driversURL)\nerr=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
-                    guard err == nil, let data = data, let dr = try? JSONDecoder().decode(DriversResponse.self, from: data) else {
+                    guard err == nil, let data = data, let dr = try? JSONDecoder().decode([DriverInfo].self, from: data) else {
                         DispatchQueue.main.async { self.diagnosisSummary = "drivers a eșuat. Vezi log." }
                         return
                     }
-                    let countDrivers = dr.data.count
+                    let countDrivers = dr.count
                     var locURLC = URLComponents(string: "\(openF1BaseURL)/location")!
                     locURLC.queryItems = [
                         URLQueryItem(name: "session_key", value: String(sk)),
@@ -691,8 +679,8 @@ class HistoricalRaceViewModel: ObservableObject {
                     URLSession.shared.dataTask(with: locURL) { data, resp, err in
                         self.log("GET /openf1/location", "url=\(locURL)\nerr=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
                         var locCount = 0
-                        if let data = data, let lr = try? JSONDecoder().decode(LocationsResponse.self, from: data) {
-                            locCount = lr.data.count
+                        if let data = data, let lr = try? JSONDecoder().decode([LocationPoint].self, from: data) {
+                            locCount = lr.count
                         }
                         DispatchQueue.main.async {
                             self.diagnosisSummary = "OK resolve (sk=\(sk)), drivers=\(countDrivers), location_first=\(locCount). Vezi log pentru detalii."
