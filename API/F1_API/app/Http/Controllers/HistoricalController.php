@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 
 /**
  * Endpoints used for historical session playback.
@@ -31,7 +31,7 @@ class HistoricalController extends Controller
             return response()->json(['error' => 'Missing parameters'], 400);
         }
 
-        $response = Http::get($this->openF1 . '/sessions', [
+        $response = Http::get($this->openF1.'/sessions', [
             'year' => $year,
             'circuit_key' => $circuitKey,
             'session_type' => $sessionType,
@@ -59,7 +59,7 @@ class HistoricalController extends Controller
      */
     public function manifest(int $sessionKey)
     {
-        $session = Http::get($this->openF1 . '/sessions', ['session_key' => $sessionKey])->json()[0] ?? null;
+        $session = Http::get($this->openF1.'/sessions', ['session_key' => $sessionKey])->json()[0] ?? null;
         if (! $session) {
             return response()->json(['error' => 'Session not found'], 404);
         }
@@ -78,12 +78,12 @@ class HistoricalController extends Controller
             ],
             'resources' => [
                 'drivers' => "/historical/session/$sessionKey/drivers",
-                'track'   => "/historical/session/$sessionKey/track",
-                'events'  => "/historical/session/$sessionKey/events",
-                'laps'    => "/historical/session/$sessionKey/laps",
-                'frames'  => [
+                'track' => "/historical/session/$sessionKey/track",
+                'events' => "/historical/session/$sessionKey/events",
+                'laps' => "/historical/session/$sessionKey/laps",
+                'frames' => [
                     'by_time' => "/historical/session/$sessionKey/frames?t={iso8601}",
-                    'window'  => "/historical/session/$sessionKey/frames?from={iso}&to={iso}&stride_ms=100&format=ndjson",
+                    'window' => "/historical/session/$sessionKey/frames?from={iso}&to={iso}&stride_ms=100&format=ndjson",
                 ],
             ],
         ]);
@@ -94,12 +94,12 @@ class HistoricalController extends Controller
      */
     public function drivers(int $sessionKey)
     {
-        $drivers = Http::get($this->openF1 . '/drivers', ['session_key' => $sessionKey])->json();
+        $drivers = Http::get($this->openF1.'/drivers', ['session_key' => $sessionKey])->json();
 
         $mapped = collect($drivers)->map(function ($d) {
             return [
-                'driver_number' => (string) $d['driver_number'],
-                'full_name' => trim(($d['first_name'] ?? '') . ' ' . ($d['last_name'] ?? '')),
+                'driver_number' => (int) $d['driver_number'],
+                'full_name' => trim(($d['first_name'] ?? '').' '.($d['last_name'] ?? '')),
                 'team_name' => $d['team_name'] ?? null,
                 'team_colour' => $d['team_colour'] ?? null,
                 'headshot_url' => $d['headshot_url'] ?? null,
@@ -116,7 +116,7 @@ class HistoricalController extends Controller
      */
     public function track(int $sessionKey)
     {
-        $session = Http::get($this->openF1 . '/sessions', ['session_key' => $sessionKey])->json()[0] ?? null;
+        $session = Http::get($this->openF1.'/sessions', ['session_key' => $sessionKey])->json()[0] ?? null;
         if (! $session) {
             return response()->json(['error' => 'Session not found'], 404);
         }
@@ -124,7 +124,7 @@ class HistoricalController extends Controller
         $bounds = Cache::remember("track_bounds_$sessionKey", 3600, function () use ($sessionKey, $session) {
             $start = Carbon::parse($session['date_start']);
             $end = $start->copy()->addSeconds(30);
-            $locations = Http::get($this->openF1 . '/location', [
+            $locations = Http::get($this->openF1.'/location', [
                 'session_key' => $sessionKey,
                 'date>=' => $start->toIso8601String(),
                 'date<=' => $end->toIso8601String(),
@@ -150,8 +150,10 @@ class HistoricalController extends Controller
 
             $padX = ($maxX - $minX) * 0.05;
             $padY = ($maxY - $minY) * 0.05;
-            $minX -= $padX; $maxX += $padX;
-            $minY -= $padY; $maxY += $padY;
+            $minX -= $padX;
+            $maxX += $padX;
+            $minY -= $padY;
+            $maxY += $padY;
 
             return [
                 'minX' => $minX,
@@ -179,7 +181,8 @@ class HistoricalController extends Controller
     /** Proxy session events. */
     public function events(int $sessionKey)
     {
-        $data = Http::get($this->openF1 . '/events', ['session_key' => $sessionKey])->json();
+        $data = Http::get($this->openF1.'/events', ['session_key' => $sessionKey])->json();
+
         return response()->json($data);
     }
 
@@ -190,7 +193,8 @@ class HistoricalController extends Controller
         if ($driver = $request->query('driver_number')) {
             $query['driver_number'] = $driver;
         }
-        $data = Http::get($this->openF1 . '/laps', $query)->json();
+        $data = Http::get($this->openF1.'/laps', $query)->json();
+
         return response()->json($data);
     }
 
@@ -218,6 +222,7 @@ class HistoricalController extends Controller
             $groups = $this->fetchLocationWindow($sessionKey, $windowStart, $windowEnd, $drivers, $include);
             $indices = [];
             $frame = $this->interpolateFrame($ts, $groups, $include, $gapMs, $indices);
+
             return response()->json([$frame]);
         }
 
@@ -248,7 +253,8 @@ class HistoricalController extends Controller
                 if ($delta && $prev) {
                     $frame['drivers'] = array_values(array_filter($frame['drivers'], function ($drv) use ($prev) {
                         $n = $drv[0];
-                        $prevDrv = collect($prev['drivers'])->firstWhere(fn($d) => $d[0] === $n);
+                        $prevDrv = collect($prev['drivers'])->firstWhere(fn ($d) => $d[0] === $n);
+
                         return $prevDrv != $drv;
                     }));
                 }
@@ -259,9 +265,10 @@ class HistoricalController extends Controller
 
         if ($format === 'ndjson') {
             $headers = ['Content-Type' => 'application/x-ndjson'];
+
             return response()->stream(function () use ($build) {
                 foreach ($build() as $frame) {
-                    echo json_encode($frame) . "\n";
+                    echo json_encode($frame)."\n";
                     @ob_flush();
                     @flush();
                 }
@@ -269,6 +276,7 @@ class HistoricalController extends Controller
         }
 
         $frames = iterator_to_array($build());
+
         return response()->json($frames);
     }
 
@@ -288,7 +296,7 @@ class HistoricalController extends Controller
             $params['driver_number'] = $drivers;
         }
 
-        $rows = Http::get($this->openF1 . '/location', $params)->json();
+        $rows = Http::get($this->openF1.'/location', $params)->json();
 
         $groups = [];
         foreach ($rows as $row) {
@@ -307,10 +315,18 @@ class HistoricalController extends Controller
         foreach ($groups as &$samples) {
             $count = count($samples);
             for ($k = 0; $k < $count; $k++) {
-                $xPrev = $samples[$k-1]['x'] ?? null; $xCur = $samples[$k]['x'] ?? null; $xNext = $samples[$k+1]['x'] ?? null;
-                $yPrev = $samples[$k-1]['y'] ?? null; $yCur = $samples[$k]['y'] ?? null; $yNext = $samples[$k+1]['y'] ?? null;
-                if ($xPrev !== null && $xCur !== null && $xNext !== null) { $samples[$k]['x'] = $this->median3($xPrev, $xCur, $xNext); }
-                if ($yPrev !== null && $yCur !== null && $yNext !== null) { $samples[$k]['y'] = $this->median3($yPrev, $yCur, $yNext); }
+                $xPrev = $samples[$k - 1]['x'] ?? null;
+                $xCur = $samples[$k]['x'] ?? null;
+                $xNext = $samples[$k + 1]['x'] ?? null;
+                $yPrev = $samples[$k - 1]['y'] ?? null;
+                $yCur = $samples[$k]['y'] ?? null;
+                $yNext = $samples[$k + 1]['y'] ?? null;
+                if ($xPrev !== null && $xCur !== null && $xNext !== null) {
+                    $samples[$k]['x'] = $this->median3($xPrev, $xCur, $xNext);
+                }
+                if ($yPrev !== null && $yCur !== null && $yNext !== null) {
+                    $samples[$k]['y'] = $this->median3($yPrev, $yCur, $yNext);
+                }
             }
         }
         unset($samples);
@@ -325,8 +341,12 @@ class HistoricalController extends Controller
     {
         $tMs = $ts->valueOf();
         $fields = ['n', 'x', 'y'];
-        if (in_array('speed', $include, true)) { $fields[] = 'v'; }
-        if (in_array('gear', $include, true)) { $fields[] = 'gear'; }
+        if (in_array('speed', $include, true)) {
+            $fields[] = 'v';
+        }
+        if (in_array('gear', $include, true)) {
+            $fields[] = 'gear';
+        }
 
         $drivers = [];
         foreach ($groups as $n => $samples) {
@@ -351,19 +371,27 @@ class HistoricalController extends Controller
                     [$pm1['x'], $pm1['y']], [$prev['x'], $prev['y']],
                     [$next['x'], $next['y']], [$pp2['x'], $pp2['y']], $u
                 );
-                if (in_array('speed', $include, true)) { $v = $this->lerp($prev['speed'], $next['speed'], $u); }
+                if (in_array('speed', $include, true)) {
+                    $v = $this->lerp($prev['speed'], $next['speed'], $u);
+                }
             } elseif ($prev && $next && ($next['t'] > $prev['t']) && (($next['t'] - $prev['t']) <= $gapMs)) {
                 $u = ($tMs - $prev['t']) / max($next['t'] - $prev['t'], 1);
                 $x = $this->lerp($prev['x'], $next['x'], $u);
                 $y = $this->lerp($prev['y'], $next['y'], $u);
-                if (in_array('speed', $include, true)) { $v = $this->lerp($prev['speed'], $next['speed'], $u); }
+                if (in_array('speed', $include, true)) {
+                    $v = $this->lerp($prev['speed'], $next['speed'], $u);
+                }
             } else {
                 // hold/teleport: keep last or next available values
             }
 
             $row = [(string) $n, $x, $y];
-            if (in_array('speed', $include, true)) { $row[] = $v; }
-            if (in_array('gear', $include, true)) { $row[] = $gear; }
+            if (in_array('speed', $include, true)) {
+                $row[] = $v;
+            }
+            if (in_array('gear', $include, true)) {
+                $row[] = $gear;
+            }
             $drivers[] = $row;
         }
 
@@ -374,62 +402,70 @@ class HistoricalController extends Controller
         ];
     }
 
-    private function catmull2_centripetal(array $p0, array $p1, array $p2, array $p3, float $t): array {
+    private function catmull2_centripetal(array $p0, array $p1, array $p2, array $p3, float $t): array
+    {
         $alpha = 0.5; // centripetal
-        $d01 = pow(hypot($p1[0]-$p0[0], $p1[1]-$p0[1]), $alpha);
-        $d12 = pow(hypot($p2[0]-$p1[0], $p2[1]-$p1[1]), $alpha);
-        $d23 = pow(hypot($p3[0]-$p2[0], $p3[1]-$p2[1]), $alpha);
+        $d01 = pow(hypot($p1[0] - $p0[0], $p1[1] - $p0[1]), $alpha);
+        $d12 = pow(hypot($p2[0] - $p1[0], $p2[1] - $p1[1]), $alpha);
+        $d23 = pow(hypot($p3[0] - $p2[0], $p3[1] - $p2[1]), $alpha);
         $t0 = 0.0;
         $t1 = $t0 + $d01 + 1e-9;
         $t2 = $t1 + $d12 + 1e-9;
         $t3 = $t2 + $d23 + 1e-9;
-        $s  = $t1 + ($t2 - $t1) * max(0.0, min(1.0, $t));
+        $s = $t1 + ($t2 - $t1) * max(0.0, min(1.0, $t));
 
         $A1 = [
-            ($t1-$s)/($t1-$t0)*$p0[0] + ($s-$t0)/($t1-$t0)*$p1[0],
-            ($t1-$s)/($t1-$t0)*$p0[1] + ($s-$t0)/($t1-$t0)*$p1[1]
+            ($t1 - $s) / ($t1 - $t0) * $p0[0] + ($s - $t0) / ($t1 - $t0) * $p1[0],
+            ($t1 - $s) / ($t1 - $t0) * $p0[1] + ($s - $t0) / ($t1 - $t0) * $p1[1],
         ];
         $A2 = [
-            ($t2-$s)/($t2-$t1)*$p1[0] + ($s-$t1)/($t2-$t1)*$p2[0],
-            ($t2-$s)/($t2-$t1)*$p1[1] + ($s-$t1)/($t2-$t1)*$p2[1]
+            ($t2 - $s) / ($t2 - $t1) * $p1[0] + ($s - $t1) / ($t2 - $t1) * $p2[0],
+            ($t2 - $s) / ($t2 - $t1) * $p1[1] + ($s - $t1) / ($t2 - $t1) * $p2[1],
         ];
         $A3 = [
-            ($t3-$s)/($t3-$t2)*$p2[0] + ($s-$t2)/($t3-$t2)*$p3[0],
-            ($t3-$s)/($t3-$t2)*$p2[1] + ($s-$t2)/($t3-$t2)*$p3[1]
+            ($t3 - $s) / ($t3 - $t2) * $p2[0] + ($s - $t2) / ($t3 - $t2) * $p3[0],
+            ($t3 - $s) / ($t3 - $t2) * $p2[1] + ($s - $t2) / ($t3 - $t2) * $p3[1],
         ];
         $B1 = [
-            ($t2-$s)/($t2-$t0)*$A1[0] + ($s-$t0)/($t2-$t0)*$A2[0],
-            ($t2-$s)/($t2-$t0)*$A1[1] + ($s-$t0)/($t2-$t0)*$A2[1]
+            ($t2 - $s) / ($t2 - $t0) * $A1[0] + ($s - $t0) / ($t2 - $t0) * $A2[0],
+            ($t2 - $s) / ($t2 - $t0) * $A1[1] + ($s - $t0) / ($t2 - $t0) * $A2[1],
         ];
         $B2 = [
-            ($t3-$s)/($t3-$t1)*$A2[0] + ($s-$t1)/($t3-$t1)*$A3[0],
-            ($t3-$s)/($t3-$t1)*$A2[1] + ($s-$t1)/($t3-$t1)*$A3[1]
+            ($t3 - $s) / ($t3 - $t1) * $A2[0] + ($s - $t1) / ($t3 - $t1) * $A3[0],
+            ($t3 - $s) / ($t3 - $t1) * $A2[1] + ($s - $t1) / ($t3 - $t1) * $A3[1],
         ];
+
         return [
-            ($t2-$s)/($t2-$t1)*$B1[0] + ($s-$t1)/($t2-$t1)*$B2[0],
-            ($t2-$s)/($t2-$t1)*$B1[1] + ($s-$t1)/($t2-$t1)*$B2[1]
+            ($t2 - $s) / ($t2 - $t1) * $B1[0] + ($s - $t1) / ($t2 - $t1) * $B2[0],
+            ($t2 - $s) / ($t2 - $t1) * $B1[1] + ($s - $t1) / ($t2 - $t1) * $B2[1],
         ];
     }
 
     private function catmull2(array $p0, array $p1, array $p2, array $p3, float $t): array
     {
-        $t2 = $t * $t; $t3 = $t2 * $t;
-        $a = -0.5*$t3 +     $t2 - 0.5*$t;
-        $b =  1.5*$t3 - 2.5*$t2 + 1.0;
-        $c = -1.5*$t3 + 2.0*$t2 + 0.5*$t;
-        $d =  0.5*$t3 - 0.5*$t2;
-        $x = $a*$p0[0] + $b*$p1[0] + $c*$p2[0] + $d*$p3[0];
-        $y = $a*$p0[1] + $b*$p1[1] + $c*$p2[1] + $d*$p3[1];
+        $t2 = $t * $t;
+        $t3 = $t2 * $t;
+        $a = -0.5 * $t3 + $t2 - 0.5 * $t;
+        $b = 1.5 * $t3 - 2.5 * $t2 + 1.0;
+        $c = -1.5 * $t3 + 2.0 * $t2 + 0.5 * $t;
+        $d = 0.5 * $t3 - 0.5 * $t2;
+        $x = $a * $p0[0] + $b * $p1[0] + $c * $p2[0] + $d * $p3[0];
+        $y = $a * $p0[1] + $b * $p1[1] + $c * $p2[1] + $d * $p3[1];
+
         return [$x, $y];
     }
 
-    private function median3($a,$b,$c){ return $a > $b ? ($b > $c ? $b : ($a > $c ? $c : $a)) : ($a > $c ? $a : ($b > $c ? $c : $b)); }
+    private function median3($a, $b, $c)
+    {
+        return $a > $b ? ($b > $c ? $b : ($a > $c ? $c : $a)) : ($a > $c ? $a : ($b > $c ? $c : $b));
+    }
 
     private function lerp($a, $b, $u)
     {
         if ($a === null || $b === null) {
             return $a ?? $b;
         }
+
         return $a + ($b - $a) * $u;
     }
 }

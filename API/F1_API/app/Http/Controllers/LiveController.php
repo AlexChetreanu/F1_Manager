@@ -55,7 +55,7 @@ class LiveController extends Controller
             // fallback pe nume dacă nu există circuit_key/meeting_key
             $meeting = $db->table('meetings')
                 ->where('year', (int) $year)
-                ->whereRaw('LOWER(meeting_name) LIKE ?', ['%' . strtolower($meetingName) . '%'])
+                ->whereRaw('LOWER(meeting_name) LIKE ?', ['%'.strtolower($meetingName).'%'])
                 ->orderBy('date_start')
                 ->first();
 
@@ -313,7 +313,7 @@ class LiveController extends Controller
             $latestLoc = $db->table('location as l')
                 ->joinSub($latestLocSub, 't', function ($j) {
                     $j->on('l.driver_number', '=', 't.driver_number')
-                      ->on('l.date', '=', 't.max_date');
+                        ->on('l.date', '=', 't.max_date');
                 })
                 ->where('l.session_key', $sessionKey)
                 ->select('l.driver_number', 'l.date', 'l.x', 'l.y', 'l.z')
@@ -336,7 +336,7 @@ class LiveController extends Controller
             $latestPos = $db->table('position as p')
                 ->joinSub($latestPosSub, 't', function ($j) {
                     $j->on('p.driver_number', '=', 't.driver_number')
-                      ->on('p.date', '=', 't.max_date');
+                        ->on('p.date', '=', 't.max_date');
                 })
                 ->where('p.session_key', $sessionKey)
                 ->select('p.driver_number', 'p.date', 'p.position')
@@ -366,7 +366,7 @@ class LiveController extends Controller
             $latestCar = $db->table('car_data as c')
                 ->joinSub($latestCarSub, 't', function ($j) {
                     $j->on('c.driver_number', '=', 't.driver_number')
-                      ->on('c.date', '=', 't.max_date');
+                        ->on('c.date', '=', 't.max_date');
                 })
                 ->where('c.session_key', $sessionKey)
                 ->select($columns)
@@ -379,7 +379,7 @@ class LiveController extends Controller
         $outDrivers = [];
         foreach ($drivers as $dn => $meta) {
             $state = [
-                'driver_number' => $dn,
+                'driver_number' => (int) $dn,
                 'name' => $meta->full_name ?? $meta->name ?? null,
                 'acronym' => $meta->name_acronym ?? null,
                 'team_name' => $meta->team_name ?? null,
@@ -447,6 +447,7 @@ class LiveController extends Controller
             $payload = $this->buildDriverState($sessionKey, $since, $fields, false);
         } catch (\Throwable $e) {
             \Log::error($e);
+
             return response()->json(['error' => 'Server error'], 500);
         }
 
@@ -457,7 +458,9 @@ class LiveController extends Controller
     {
         @ini_set('zlib.output_compression', '0');
         @ini_set('implicit_flush', '1');
-        while (ob_get_level() > 0) { @ob_end_flush(); }
+        while (ob_get_level() > 0) {
+            @ob_end_flush();
+        }
         @set_time_limit(0);
 
         $sessionKey = (int) $request->query('session_key');
@@ -510,7 +513,7 @@ class LiveController extends Controller
                 }
 
                 echo "event: tick\n";
-                echo 'data: ' . json_encode($payload) . "\n\n";
+                echo 'data: '.json_encode($payload)."\n\n";
                 @ob_flush();
                 @flush();
 
@@ -526,7 +529,9 @@ class LiveController extends Controller
     {
         @ini_set('zlib.output_compression', '0');
         @ini_set('implicit_flush', '1');
-        while (ob_get_level() > 0) { @ob_end_flush(); }
+        while (ob_get_level() > 0) {
+            @ob_end_flush();
+        }
         @set_time_limit(0);
 
         $sessionKey = (int) $request->query('session_key');
@@ -570,7 +575,7 @@ class LiveController extends Controller
                 }
 
                 echo "event: tick\n";
-                echo 'data: ' . json_encode($payload) . "\n\n";
+                echo 'data: '.json_encode($payload)."\n\n";
                 @ob_flush();
                 @flush();
 
@@ -582,4 +587,3 @@ class LiveController extends Controller
         return response()->stream($callback, 200, $headers);
     }
 }
-
