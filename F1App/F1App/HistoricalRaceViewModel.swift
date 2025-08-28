@@ -46,12 +46,22 @@ struct StrategyResponse: Decodable {
     let error: String?
 }
 
-func loadStrategy(meeting: Int) async -> [StrategySuggestion] {
+func loadStrategy(meeting: Int, retry: Int = 0) async -> [StrategySuggestion] {
     let url = API.historicalBaseURL.appendingPathComponent("/api/historical/meeting/\(meeting)/strategy")
     do {
         let (data, resp) = try await URLSession.shared.data(from: url)
-        let http = resp as! HTTPURLResponse
-        guard (200..<300).contains(http.statusCode) else { return [] }
+        guard let http = resp as? HTTPURLResponse else { return [] }
+        guard http.statusCode == 200 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            if http.statusCode == 429, retry < 3 {
+                print("Strategy HTTP 429: \(body)")
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                return await loadStrategy(meeting: meeting, retry: retry + 1)
+            } else {
+                print("Strategy HTTP \(http.statusCode): \(body)")
+                return []
+            }
+        }
         let decoded = try JSONDecoder().decode(StrategyResponse.self, from: data)
         if let list = decoded.suggestions { return list }
         if let one = decoded.suggestion { return [one] }
@@ -268,96 +278,141 @@ class HistoricalRaceViewModel: ObservableObject {
         var comps = URLComponents(string: "\(openF1BaseURL)/drivers")!
         comps.queryItems = [URLQueryItem(name: "session_key", value: String(sessionKey))]
         guard let url = comps.url else { return }
-        URLSession.shared.dataTask(with: url) { data, resp, error in
-            self.log("GET /openf1/drivers", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
-            if let error = error {
-                DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /drivers: \(error.localizedDescription)" }
-                return
-            }
-            guard let data = data else { return }
-            do {
-                let response = try JSONDecoder().decode([DriverInfo].self, from: data)
-                let uniqueDrivers = Array(Set(response))
-                DispatchQueue.main.async {
-                    self.drivers = uniqueDrivers
-                    self.fetchLocations(sessionKey: sessionKey)
+        RequestThrottler.shared.execute {
+            URLSession.shared.dataTask(with: url) { data, resp, error in
+                self.log("GET /openf1/drivers", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+                if let error = error {
+                    DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /drivers: \(error.localizedDescription)" }
+                    return
                 }
-            } catch {
-                self.log("decode /drivers", error.localizedDescription)
-            }
-        }.resume()
+                guard let http = resp as? HTTPURLResponse else { return }
+                guard http.statusCode == 200 else {
+                    if http.statusCode == 429 {
+                        self.log("HTTP 429 /drivers", self.previewBody(data))
+                        DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
+                            self.fetchDrivers(sessionKey: sessionKey)
+                        }
+                    } else {
+                        self.log("HTTP \(http.statusCode) /drivers", self.previewBody(data))
+                        DispatchQueue.main.async { self.errorMessage = "Eroare /drivers: cod \(http.statusCode)" }
+                    }
+                    return
+                }
+                guard let data = data else { return }
+                do {
+                    let response = try JSONDecoder().decode([DriverInfo].self, from: data)
+                    let uniqueDrivers = Array(Set(response))
+                    DispatchQueue.main.async {
+                        self.drivers = uniqueDrivers
+                        self.fetchLocations(sessionKey: sessionKey)
+                    }
+                } catch {
+                    self.log("decode /drivers", error.localizedDescription)
+                }
+            }.resume()
+        }
     }
 
     private func fetchRaceControl(sessionKey: Int) {
         var comps = URLComponents(string: "\(openF1BaseURL)/race_control")!
         comps.queryItems = [URLQueryItem(name: "session_key", value: String(sessionKey))]
         guard let url = comps.url else { return }
-        URLSession.shared.dataTask(with: url) { data, resp, error in
-            self.log("GET /openf1/race_control", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
-            if let error = error {
-                DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /race_control: \(error.localizedDescription)" }
-                return
-            }
-            guard let data = data else { return }
-            do {
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let response = try decoder.decode([RaceEventDTO].self, from: data)
-                let sorted: [RaceEventDTO]
-                if let start = self.sessionStartDate {
-                    sorted = response.sorted {
-                        (eventTimeMs($0, sessionStart: start) ?? .max) < (eventTimeMs($1, sessionStart: start) ?? .max)
-                    }
-                } else {
-                    sorted = response.sorted {
-                        ($0.dateIso ?? $0.date ?? "") < ($1.dateIso ?? $1.date ?? "")
-                    }
+        RequestThrottler.shared.execute {
+            URLSession.shared.dataTask(with: url) { data, resp, error in
+                self.log("GET /openf1/race_control", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+                if let error = error {
+                    DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /race_control: \(error.localizedDescription)" }
+                    return
                 }
-                DispatchQueue.main.async {
-                    self.allRaceControlMessages = sorted
-                    self.nextRaceControlIndex = 0
-                    self.log("race_control fetched", "count=\(sorted.count)")
+                guard let http = resp as? HTTPURLResponse else { return }
+                guard http.statusCode == 200 else {
+                    if http.statusCode == 429 {
+                        self.log("HTTP 429 /race_control", self.previewBody(data))
+                        DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
+                            self.fetchRaceControl(sessionKey: sessionKey)
+                        }
+                    } else {
+                        self.log("HTTP \(http.statusCode) /race_control", self.previewBody(data))
+                        DispatchQueue.main.async { self.errorMessage = "Eroare /race_control: cod \(http.statusCode)" }
+                    }
+                    return
                 }
-            } catch {
-                self.log("decode /race_control", error.localizedDescription)
-            }
-        }.resume()
+                guard let data = data else { return }
+                do {
+                    let decoder = JSONDecoder()
+                    decoder.keyDecodingStrategy = .convertFromSnakeCase
+                    let response = try decoder.decode([RaceEventDTO].self, from: data)
+                    let sorted: [RaceEventDTO]
+                    if let start = self.sessionStartDate {
+                        sorted = response.sorted {
+                            (eventTimeMs($0, sessionStart: start) ?? .max) < (eventTimeMs($1, sessionStart: start) ?? .max)
+                        }
+                    } else {
+                        sorted = response.sorted {
+                            ($0.dateIso ?? $0.date ?? "") < ($1.dateIso ?? $1.date ?? "")
+                        }
+                    }
+                    DispatchQueue.main.async {
+                        self.allRaceControlMessages = sorted
+                        self.nextRaceControlIndex = 0
+                        self.log("race_control fetched", "count=\(sorted.count)")
+                    }
+                } catch {
+                    self.log("decode /race_control", error.localizedDescription)
+                }
+            }.resume()
+        }
     }
 
     private func fetchOvertakes(sessionKey: Int) {
         var comps = URLComponents(string: "\(openF1BaseURL)/overtakes")!
         comps.queryItems = [URLQueryItem(name: "session_key", value: String(sessionKey))]
         guard let url = comps.url else { return }
-        URLSession.shared.dataTask(with: url) { data, resp, error in
-            self.log("GET /openf1/overtakes", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
-            if let error = error {
-                DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /overtakes: \(error.localizedDescription)" }
-                return
-            }
-            guard let data = data else { return }
-            do {
-                let decoder = JSONDecoder()
-                decoder.keyDecodingStrategy = .convertFromSnakeCase
-                let response = try decoder.decode([RaceEventDTO].self, from: data)
-                let sorted: [RaceEventDTO]
-                if let start = self.sessionStartDate {
-                    sorted = response.sorted {
-                        (eventTimeMs($0, sessionStart: start) ?? .max) < (eventTimeMs($1, sessionStart: start) ?? .max)
-                    }
-                } else {
-                    sorted = response.sorted {
-                        ($0.dateIso ?? $0.date ?? "") < ($1.dateIso ?? $1.date ?? "")
-                    }
+        RequestThrottler.shared.execute {
+            URLSession.shared.dataTask(with: url) { data, resp, error in
+                self.log("GET /openf1/overtakes", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+                if let error = error {
+                    DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /overtakes: \(error.localizedDescription)" }
+                    return
                 }
-                DispatchQueue.main.async {
-                    self.allOvertakes = sorted
-                    self.nextOvertakeIndex = 0
-                    self.log("overtakes fetched", "count=\(sorted.count)")
+                guard let http = resp as? HTTPURLResponse else { return }
+                guard http.statusCode == 200 else {
+                    if http.statusCode == 429 {
+                        self.log("HTTP 429 /overtakes", self.previewBody(data))
+                        DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
+                            self.fetchOvertakes(sessionKey: sessionKey)
+                        }
+                    } else {
+                        self.log("HTTP \(http.statusCode) /overtakes", self.previewBody(data))
+                        DispatchQueue.main.async { self.errorMessage = "Eroare /overtakes: cod \(http.statusCode)" }
+                    }
+                    return
                 }
-            } catch {
-                self.log("decode /overtakes", error.localizedDescription)
-            }
-        }.resume()
+                guard let data = data else { return }
+                do {
+                    let decoder = JSONDecoder()
+                    decoder.keyDecodingStrategy = .convertFromSnakeCase
+                    let response = try decoder.decode([RaceEventDTO].self, from: data)
+                    let sorted: [RaceEventDTO]
+                    if let start = self.sessionStartDate {
+                        sorted = response.sorted {
+                            (eventTimeMs($0, sessionStart: start) ?? .max) < (eventTimeMs($1, sessionStart: start) ?? .max)
+                        }
+                    } else {
+                        sorted = response.sorted {
+                            ($0.dateIso ?? $0.date ?? "") < ($1.dateIso ?? $1.date ?? "")
+                        }
+                    }
+                    DispatchQueue.main.async {
+                        self.allOvertakes = sorted
+                        self.nextOvertakeIndex = 0
+                        self.log("overtakes fetched", "count=\(sorted.count)")
+                    }
+                } catch {
+                    self.log("decode /overtakes", error.localizedDescription)
+                }
+            }.resume()
+        }
     }
 
     private func fetchLocations(sessionKey: Int) {
@@ -400,68 +455,91 @@ class HistoricalRaceViewModel: ObservableObject {
                 URLQueryItem(name: "offset", value: String(offset))
             ]
             guard let url = comps.url else { return }
-            URLSession.shared.dataTask(with: url) { data, resp, error in
-                self.log("GET /openf1/location", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
-                if let error = error {
-                    DispatchQueue.main.async {
-                        self.errorMessage = "Eroare rețea la /location: \(error.localizedDescription)"
-                        self.driverFetchCompleted()
-                    }
-                    return
-                }
-                guard let data = data else {
-                    DispatchQueue.main.async { self.driverFetchCompleted() }
-                    return
-                }
-                do {
-                    let response = try JSONDecoder().decode([LocationPoint].self, from: data)
-                    let converted = response.map { lp -> LocationPoint in
-                        var isoDate = lp.date
-                        if let d = self.backendFormatter.date(from: lp.date) {
-                            isoDate = self.dateFormatter.string(from: d)
-                        }
-                        return LocationPoint(driver_number: lp.driver_number, date: isoDate, x: lp.x, y: lp.y)
-                    }
-                    let newAccum = accumulated + converted
-                    if response.count == 1000 {
-                        fetchDriverLocations(driver: driver,
-                                             sessionKey: sessionKey,
-                                             startStr: startStr,
-                                             endStr: endStr,
-                                             offset: offset + 1000,
-                                             accumulated: newAccum)
-                    } else {
+            RequestThrottler.shared.execute {
+                URLSession.shared.dataTask(with: url) { data, resp, error in
+                    self.log("GET /openf1/location", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+                    if let error = error {
                         DispatchQueue.main.async {
-                            var processed = newAccum
-                            if newAccum.count > 2,
-                               let startDate = self.dateFormatter.date(from: newAccum[0].date) {
-                                let resampler = PositionResampler()
-                                let samples: [PositionSample] = newAccum.compactMap { lp in
-                                    guard let d = self.dateFormatter.date(from: lp.date) else { return nil }
-                                    let t = d.timeIntervalSince(startDate)
-                                    return PositionSample(t: t, x: lp.x, y: lp.y)
-                                }
-                                let smoothed = resampler.resample(samples: samples)
-                                processed = smoothed.map { s in
-                                    let date = startDate.addingTimeInterval(s.t)
-                                    return LocationPoint(
-                                        driver_number: driver.driver_number,
-                                        date: self.dateFormatter.string(from: date),
-                                        x: s.x,
-                                        y: s.y
-                                    )
-                                }
-                            }
-                            self.positions[driver.driver_number] = processed
-                            self.currentPosition[driver.driver_number] = processed.first
+                            self.errorMessage = "Eroare rețea la /location: \(error.localizedDescription)"
                             self.driverFetchCompleted()
                         }
+                        return
                     }
-                } catch {
-                    self.log("decode /location", error.localizedDescription)
-                    DispatchQueue.main.async { self.driverFetchCompleted() }
-                }
-            }.resume()
+                    guard let http = resp as? HTTPURLResponse else {
+                        DispatchQueue.main.async { self.driverFetchCompleted() }
+                        return
+                    }
+                    guard http.statusCode == 200 else {
+                        if http.statusCode == 429 {
+                            self.log("HTTP 429 /location", self.previewBody(data))
+                            DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
+                                fetchDriverLocations(driver: driver,
+                                                     sessionKey: sessionKey,
+                                                     startStr: startStr,
+                                                     endStr: endStr,
+                                                     offset: offset,
+                                                     accumulated: accumulated)
+                            }
+                        } else {
+                            self.log("HTTP \(http.statusCode) /location", self.previewBody(data))
+                            DispatchQueue.main.async { self.driverFetchCompleted() }
+                        }
+                        return
+                    }
+                    guard let data = data else {
+                        DispatchQueue.main.async { self.driverFetchCompleted() }
+                        return
+                    }
+                    do {
+                        let response = try JSONDecoder().decode([LocationPoint].self, from: data)
+                        let converted = response.map { lp -> LocationPoint in
+                            var isoDate = lp.date
+                            if let d = self.backendFormatter.date(from: lp.date) {
+                                isoDate = self.dateFormatter.string(from: d)
+                            }
+                            return LocationPoint(driver_number: lp.driver_number, date: isoDate, x: lp.x, y: lp.y)
+                        }
+                        let newAccum = accumulated + converted
+                        if response.count == 1000 {
+                            fetchDriverLocations(driver: driver,
+                                                 sessionKey: sessionKey,
+                                                 startStr: startStr,
+                                                 endStr: endStr,
+                                                 offset: offset + 1000,
+                                                 accumulated: newAccum)
+                        } else {
+                            DispatchQueue.main.async {
+                                var processed = newAccum
+                                if newAccum.count > 2,
+                                   let startDate = self.dateFormatter.date(from: newAccum[0].date) {
+                                    let resampler = PositionResampler()
+                                    let samples: [PositionSample] = newAccum.compactMap { lp in
+                                        guard let d = self.dateFormatter.date(from: lp.date) else { return nil }
+                                        let t = d.timeIntervalSince(startDate)
+                                        return PositionSample(t: t, x: lp.x, y: lp.y)
+                                    }
+                                    let smoothed = resampler.resample(samples: samples)
+                                    processed = smoothed.map { s in
+                                        let date = startDate.addingTimeInterval(s.t)
+                                        return LocationPoint(
+                                            driver_number: driver.driver_number,
+                                            date: self.dateFormatter.string(from: date),
+                                            x: s.x,
+                                            y: s.y
+                                        )
+                                    }
+                                }
+                                self.positions[driver.driver_number] = processed
+                                self.currentPosition[driver.driver_number] = processed.first
+                                self.driverFetchCompleted()
+                            }
+                        }
+                    } catch {
+                        self.log("decode /location", error.localizedDescription)
+                        DispatchQueue.main.async { self.driverFetchCompleted() }
+                    }
+                }.resume()
+            }
         }
     }
 
