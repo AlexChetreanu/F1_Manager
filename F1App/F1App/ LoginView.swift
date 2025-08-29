@@ -138,11 +138,6 @@ struct DashboardView: View {
                     Label("Acasă", systemImage: "house.fill")
                 }
 
-            DriversView()
-                .tabItem {
-                    Label("Piloți", systemImage: "person.3.fill")
-                }
-
             StandingsView()
                 .tabItem {
                     Label("Clasament", systemImage: "list.number")
@@ -159,6 +154,7 @@ struct DashboardView: View {
                 }
              //   .navigationBarBackButtonHidden(false)
         }
+        .tint(.white)
     }
 }
 

@@ -6,11 +6,37 @@
 //
 
 import SwiftUI
+import UIKit
 
 @main
 struct F1AppApp: App {
     @State private var showSplash = true
     @StateObject private var teamColorStore = TeamColorStore()
+
+    init() {
+        let themeColor = UIColor(hex: "ce2d1e")
+
+        // Navigation bar styling
+        let navAppearance = UINavigationBarAppearance()
+        navAppearance.configureWithOpaqueBackground()
+        navAppearance.backgroundColor = themeColor
+        navAppearance.titleTextAttributes = [.foregroundColor: UIColor.white]
+        navAppearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
+        UINavigationBar.appearance().standardAppearance = navAppearance
+        UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
+        UINavigationBar.appearance().compactAppearance = navAppearance
+        UINavigationBar.appearance().barTintColor = themeColor
+        UINavigationBar.appearance().tintColor = .white
+
+        // Tab bar styling
+        let tabAppearance = UITabBarAppearance()
+        tabAppearance.configureWithOpaqueBackground()
+        tabAppearance.backgroundColor = themeColor
+        UITabBar.appearance().standardAppearance = tabAppearance
+        UITabBar.appearance().scrollEdgeAppearance = tabAppearance
+        UITabBar.appearance().barTintColor = themeColor
+        UITabBar.appearance().tintColor = .white
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -25,6 +51,7 @@ struct F1AppApp: App {
                     .transition(.opacity)
                 }
             }
+            .background(Color.black.ignoresSafeArea())
             .environmentObject(teamColorStore)
         }
     }
