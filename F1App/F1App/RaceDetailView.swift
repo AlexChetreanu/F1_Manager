@@ -31,9 +31,17 @@ struct RaceDetailView: View {
                     RaceResultsView(race: race, viewModel: viewModel)
                         .padding()
                 } else {
-                    CircuitView(coordinatesJSON: race.coordinates, viewModel: viewModel)
-                        .frame(height: UIScreen.main.bounds.height / 2)
-                        .padding()
+                    ZStack {
+                        if isUpcomingRace {
+                            Image("nahuui")
+                                .resizable()
+                                .scaledToFill()
+                                .clipped()
+                        }
+                        CircuitView(coordinatesJSON: race.coordinates, viewModel: viewModel)
+                    }
+                    .frame(height: UIScreen.main.bounds.height / 2)
+                    .padding()
                     if isUpcomingRace {
                         VStack(spacing: 4) {
                             Text("START IN")
