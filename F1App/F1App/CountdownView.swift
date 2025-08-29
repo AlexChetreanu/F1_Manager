@@ -7,8 +7,11 @@ struct CountdownView: View {
 
     var body: some View {
         Text(formattedTime)
-            .font(.largeTitle)
+            .font(.custom("New York", size: 34))
             .padding()
+            .background(Color.red)
+            .foregroundColor(.white)
+            .cornerRadius(8)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(Color.black, lineWidth: 2)
