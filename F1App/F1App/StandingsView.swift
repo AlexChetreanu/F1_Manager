@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct StandingsView: View {
-    @EnvironmentObject var colorStore: TeamColorStore
     @State private var standings: [DriverStanding] = []
     @State private var selectedTab: String = "Piloți"
     
@@ -42,23 +41,11 @@ struct StandingsView: View {
                         }
                     } else {
                         ForEach(teamStandings(), id: \.team) { teamStanding in
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(teamStanding.team)
-                                        .font(.headline)
-                                    Text("Puncte: \(teamStanding.points)")
-                                        .font(.subheadline)
-                                }
-                                Spacer()
-                                Circle()
-                                    .fill(colorStore.color(forTeamName: teamStanding.team))
-                                    .frame(width: 40, height: 40)
-                                    .overlay(
-                                        Image(teamLogoName(for: teamStanding.team))
-                                            .resizable()
-                                            .scaledToFit()
-                                            .padding(6)
-                                    )
+                            VStack(alignment: .leading) {
+                                Text(teamStanding.team)
+                                    .font(.headline)
+                                Text("Puncte: \(teamStanding.points)")
+                                    .font(.subheadline)
                             }
                             .padding(.vertical, 4)
                         }
@@ -90,14 +77,6 @@ struct StandingsView: View {
             TeamStanding(team: team, points: drivers.reduce(0) { $0 + $1.points })
         }
         return teamStandings.sorted { $0.points > $1.points }
-    }
-
-    private func teamLogoName(for team: String) -> String {
-        let cleaned = team
-            .lowercased()
-            .replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: "-", with: "")
-        return "2025\(cleaned)logo"
     }
     
 }
