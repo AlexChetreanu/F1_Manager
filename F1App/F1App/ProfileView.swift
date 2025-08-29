@@ -37,32 +37,38 @@ struct ProfileView: View {
                                 .navigationTitle("Profil")
                             ) {
                                 Label("Profil", systemImage: "person.fill")
+                                    .foregroundColor(.black)
                             }
-                    
+
                             NavigationLink(destination: ChangePasswordView()) {
                                 Label("Parolă", systemImage: "lock.fill")
+                                    .foregroundColor(.black)
                             }
 
 
                     
                     NavigationLink(destination: Text("Subscriții View")) {
                         Label("Subscriții", systemImage: "creditcard.fill")
+                            .foregroundColor(.black)
                     }
                 }
-                
+
                 Section(header: Text("Setări")) {
                     NavigationLink(destination: Text("Notificări View")) {
                         Label("Notificări", systemImage: "bell.fill")
+                            .foregroundColor(.black)
                     }
                 }
-                
+
                 Section(header: Text("Suport")) {
                     NavigationLink(destination: Text("Ajutor View")) {
                         Label("Help", systemImage: "questionmark.circle.fill")
+                            .foregroundColor(.black)
                     }
-                    
+
                     NavigationLink(destination: Text("Despre View")) {
                         Label("Despre", systemImage: "info.circle.fill")
+                            .foregroundColor(.black)
                     }
                 }
                 
