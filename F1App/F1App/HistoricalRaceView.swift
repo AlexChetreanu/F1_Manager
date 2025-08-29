@@ -51,7 +51,7 @@ struct HistoricalRaceView: View {
                             }
                             path.closeSubpath()
                         }
-                        .stroke(Color.blue, lineWidth: 2)
+                        .stroke(Color.black, lineWidth: 4)
 
                         if !viewModel.currentPosition.isEmpty {
                             ForEach(viewModel.drivers) { driver in
