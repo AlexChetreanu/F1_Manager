@@ -37,7 +37,7 @@ struct RaceDetailView: View {
                     if isUpcomingRace {
                         VStack(spacing: 4) {
                             Text("START IN")
-                                .font(.headline)
+                                .font(.custom("New York", size: 17))
                             CountdownView(dateString: race.date)
                         }
                         .padding()
