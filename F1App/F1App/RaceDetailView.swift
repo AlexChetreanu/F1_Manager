@@ -38,7 +38,13 @@ struct RaceDetailView: View {
                                 .scaledToFill()
                                 .clipped()
                         }
-                        CircuitView(coordinatesJSON: race.coordinates, viewModel: viewModel)
+                        CircuitView(
+                            coordinatesJSON: race.coordinates,
+                            viewModel: viewModel,
+                            lineColor: isUpcomingRace ? Color(hex: "ce2d1e") : .white,
+                            lineWidth: isUpcomingRace ? 6 : 4,
+                            sizeScale: isUpcomingRace ? 0.9 : 1.0
+                        )
                     }
                     .frame(height: UIScreen.main.bounds.height / 2)
                     .padding()
