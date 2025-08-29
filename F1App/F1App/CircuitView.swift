@@ -58,20 +58,26 @@ struct CircuitView: View {
             if points.isEmpty {
                 Text("No coordinates available").foregroundColor(.red)
             } else {
+                let size = min(geo.size.width, geo.size.height)
+                let xOffset = (geo.size.width - size) / 2
+                let yOffset = (geo.size.height - size) / 2
+
                 ZStack {
                     Path { path in
                         let first = points[0]
-                        path.move(to: CGPoint(x: first.x * geo.size.width, y: first.y * geo.size.height))
+                        path.move(to: CGPoint(x: first.x * size + xOffset, y: first.y * size + yOffset))
                         for point in points.dropFirst() {
-                            path.addLine(to: CGPoint(x: point.x * geo.size.width, y: point.y * geo.size.height))
+                            path.addLine(to: CGPoint(x: point.x * size + xOffset, y: point.y * size + yOffset))
                         }
                         path.closeSubpath()
                     }
-                    .stroke(Color.blue, lineWidth: 2)
+                    .stroke(Color.white, lineWidth: 4)
 
                     ForEach(viewModel.drivers) { driver in
                         if let loc = viewModel.currentPosition[driver.driver_number] {
-                            let p = viewModel.point(for: loc, in: geo.size)
+                            let p = viewModel.point(for: loc, in: CGSize(width: size, height: size))
+                            let positioned = CGPoint(x: p.x + xOffset, y: p.y + yOffset)
+
                             Button {
                                 if let loc = viewModel.currentPosition[driver.driver_number] {
                                     selectedDriver = DriverSelection(driver: driver, point: loc)
@@ -87,7 +93,7 @@ struct CircuitView: View {
                                 }
                             }
                             .buttonStyle(PlainButtonStyle())
-                            .position(p)
+                            .position(positioned)
                         }
                     }
                 }
