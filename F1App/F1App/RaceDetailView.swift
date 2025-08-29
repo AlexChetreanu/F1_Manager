@@ -45,23 +45,22 @@ struct RaceDetailView: View {
                                     )
                                 )
                                 .clipped()
+                        }
+                        CircuitView(
+                            coordinatesJSON: race.coordinates,
+                            viewModel: viewModel,
+                            lineColor: isUpcomingRace ? Color(hex: "ce2d1e") : .white,
+                            lineWidth: isUpcomingRace ? 6 : 4,
+                            sizeScale: isUpcomingRace ? 0.9 : 1.0,
+                            backgroundColor: isUpcomingRace ? Color(hex: "37373d") : Color.gray.opacity(0.1)
+                        )
                     }
-                    CircuitView(
-                        coordinatesJSON: race.coordinates,
-                        viewModel: viewModel,
-                        lineColor: isUpcomingRace ? Color(hex: "ce2d1e") : .white,
-                        lineWidth: isUpcomingRace ? 6 : 4,
-                        sizeScale: isUpcomingRace ? 0.9 : 1.0,
-                        backgroundColor: isUpcomingRace ? Color(hex: "37373d") : Color.gray.opacity(0.1)
-                    )
-                }
-                .frame(height: UIScreen.main.bounds.height / 2)
-                .background(isUpcomingRace ? Color(hex: "37373d") : Color.clear)
-                .padding()
-                if isUpcomingRace {
-                    VStack(spacing: 4) {
-                        Text("START IN")
-                            .font(.headline)
+                    .frame(height: UIScreen.main.bounds.height / 2)
+                    .padding()
+                    if isUpcomingRace {
+                        VStack(spacing: 4) {
+                            Text("START IN")
+                                .font(.headline)
                             CountdownView(dateString: race.date)
                         }
                         .padding()
