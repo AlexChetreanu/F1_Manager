@@ -10,6 +10,9 @@ import SwiftUI
 struct CircuitView: View {
     let coordinatesJSON: String?
     @ObservedObject var viewModel: HistoricalRaceViewModel
+    let lineColor: Color
+    let lineWidth: CGFloat
+    let sizeScale: CGFloat
     struct DriverSelection: Identifiable {
         let driver: DriverInfo
         let point: LocationPoint
@@ -17,9 +20,18 @@ struct CircuitView: View {
     }
     @State private var selectedDriver: DriverSelection?
 
-    init(coordinatesJSON: String?, viewModel: HistoricalRaceViewModel) {
+    init(
+        coordinatesJSON: String?,
+        viewModel: HistoricalRaceViewModel,
+        lineColor: Color = .white,
+        lineWidth: CGFloat = 4,
+        sizeScale: CGFloat = 1.0
+    ) {
         self.coordinatesJSON = coordinatesJSON
         self.viewModel = viewModel
+        self.lineColor = lineColor
+        self.lineWidth = lineWidth
+        self.sizeScale = sizeScale
     }
 
     // Determine track points either from view model or by parsing JSON
@@ -58,7 +70,7 @@ struct CircuitView: View {
             if points.isEmpty {
                 Text("No coordinates available").foregroundColor(.red)
             } else {
-                let size = min(geo.size.width, geo.size.height)
+                let size = min(geo.size.width, geo.size.height) * sizeScale
                 let xOffset = (geo.size.width - size) / 2
                 let yOffset = (geo.size.height - size) / 2
 
@@ -71,7 +83,7 @@ struct CircuitView: View {
                         }
                         path.closeSubpath()
                     }
-                    .stroke(Color.white, lineWidth: 4)
+                    .stroke(lineColor, lineWidth: lineWidth)
 
                     ForEach(viewModel.drivers) { driver in
                         if let loc = viewModel.currentPosition[driver.driver_number] {
