@@ -36,6 +36,14 @@ struct RaceDetailView: View {
                             Image("nahuui")
                                 .resizable()
                                 .scaledToFill()
+                                .overlay(
+                                    RadialGradient(
+                                        gradient: Gradient(colors: [Color.white.opacity(0), Color.white.opacity(0.6)]),
+                                        center: .center,
+                                        startRadius: 0,
+                                        endRadius: UIScreen.main.bounds.width
+                                    )
+                                )
                                 .clipped()
                         }
                         CircuitView(
