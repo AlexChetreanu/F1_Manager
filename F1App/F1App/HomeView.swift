@@ -14,7 +14,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Știri F1 (Autosport)") {
+                Section {
                     if viewModel.isLoading {
                         ProgressView().frame(maxWidth: .infinity)
                     } else if let error = viewModel.error {
@@ -39,6 +39,9 @@ struct HomeView: View {
                                 .frame(maxWidth: .infinity)
                         }
                     }
+                } header: {
+                    Text("Știri F1 (Autosport)")
+                        .font(.title2)
                 }
             }
             .listStyle(.plain)
