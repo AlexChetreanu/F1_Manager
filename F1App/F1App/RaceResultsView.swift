@@ -277,6 +277,13 @@ struct PodiumView: View {
         HStack(alignment: .bottom, spacing: 16) {
             ForEach(entries) { entry in
                 VStack {
+                    Image.driver(named: driverImageName(for: entry.driver_number))
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 60, height: 60, alignment: .top)
+                        .scaleEffect(1.5, anchor: .top)
+                        .clipped()
+                        .clipShape(Circle())
                     Text(driverName(for: entry.driver_number))
                         .font(.caption)
                     if entry.dnf == true {
@@ -301,6 +308,20 @@ struct PodiumView: View {
         guard let num = number,
               let driver = viewModel.drivers.first(where: { $0.driver_number == num }) else { return "-" }
         return driver.full_name
+    }
+
+    private func driverImageName(for number: Int?) -> String {
+        guard let num = number,
+              let driver = viewModel.drivers.first(where: { $0.driver_number == num }) else { return "" }
+        let lastName = driver.full_name.split(separator: " ").last.map(String.init) ?? driver.full_name
+        switch lastName.lowercased() {
+        case "russell":
+            return "Russel"
+        case "colapinto":
+            return "Colopinto"
+        default:
+            return lastName.capitalized
+        }
     }
 
     private func gapText(for gap: GapToLeader?) -> String {
