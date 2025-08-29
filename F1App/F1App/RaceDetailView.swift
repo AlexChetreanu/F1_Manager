@@ -51,8 +51,7 @@ struct RaceDetailView: View {
                             viewModel: viewModel,
                             lineColor: isUpcomingRace ? Color(hex: "ce2d1e") : .white,
                             lineWidth: isUpcomingRace ? 6 : 4,
-                            sizeScale: isUpcomingRace ? 0.9 : 1.0,
-                            backgroundColor: isUpcomingRace ? Color(hex: "37373d") : Color.gray.opacity(0.1)
+                            sizeScale: isUpcomingRace ? 0.9 : 1.0
                         )
                     }
                     .frame(height: UIScreen.main.bounds.height / 2)
