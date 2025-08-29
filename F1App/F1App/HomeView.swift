@@ -43,6 +43,7 @@ struct HomeView: View {
             }
             .listStyle(.plain)
             .navigationTitle("Acasă")
+            .navigationBarTitleDisplayMode(.inline)
             .task { await viewModel.load() }
             .refreshable { await viewModel.load() }
             .navigationDestination(item: $selectedItem) { item in

@@ -24,6 +24,7 @@ struct RacesView: View {
                 }
             }
             .navigationTitle("F1 Circuits")
+            .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 viewModel.fetchRaces()
             }

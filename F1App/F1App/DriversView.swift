@@ -20,6 +20,7 @@ struct DriversView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(AppColors.bg)
             .navigationTitle("Piloți")
+            .navigationBarTitleDisplayMode(.inline)
             .background(AppColors.bg.ignoresSafeArea())
         }
     }

@@ -27,6 +27,7 @@ struct F1AppApp: App {
         UINavigationBar.appearance().compactAppearance = navAppearance
         UINavigationBar.appearance().barTintColor = themeColor
         UINavigationBar.appearance().tintColor = .white
+        UINavigationBar.appearance().prefersLargeTitles = false
 
         // Tab bar styling
         let tabAppearance = UITabBarAppearance()
