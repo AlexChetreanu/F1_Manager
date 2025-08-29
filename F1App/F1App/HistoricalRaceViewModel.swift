@@ -771,8 +771,8 @@ class HistoricalRaceViewModel: ObservableObject {
         }.resume()
     }
 
-    func loadSnapshot(forYear year: Int) {
-        snapshotService.fetchSnapshot(year: year) { result in
+    func loadSnapshot(forYear year: Int, circuitKey: Int) {
+        snapshotService.fetchSnapshot(year: year, circuitKey: circuitKey) { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let snap):

@@ -32,8 +32,14 @@ struct LiveSnapshot: Decodable {
 }
 
 class HistoricalSnapshotService {
-    func fetchSnapshot(year: Int, completion: @escaping (Result<LiveSnapshot, Error>) -> Void) {
-        guard let sessionsURL = URL(string: "\(openF1BaseURL)/sessions?year=\(year)&session_type=Race&limit=1") else {
+    func fetchSnapshot(year: Int, circuitKey: Int, completion: @escaping (Result<LiveSnapshot, Error>) -> Void) {
+        var comps = URLComponents(string: "\(API.base)/api/openf1/sessions")
+        comps?.queryItems = [
+            URLQueryItem(name: "circuit_key", value: String(circuitKey)),
+            URLQueryItem(name: "session_name", value: "Race"),
+            URLQueryItem(name: "year", value: String(year))
+        ]
+        guard let sessionsURL = comps?.url else {
             completion(.failure(URLError(.badURL)))
             return
         }
@@ -48,7 +54,9 @@ class HistoricalSnapshotService {
                 return
             }
             let sessionKey = session.session_key
-            guard let snapshotURL = URL(string: "\(openF1BaseURL)/live/snapshot?session_key=\(sessionKey)") else {
+            var snapComps = URLComponents(string: "\(API.base)/api/live/snapshot")
+            snapComps?.queryItems = [URLQueryItem(name: "session_key", value: String(sessionKey))]
+            guard let snapshotURL = snapComps?.url else {
                 completion(.failure(URLError(.badURL)))
                 return
             }
