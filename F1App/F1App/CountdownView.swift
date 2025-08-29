@@ -9,18 +9,20 @@ struct CountdownView: View {
         Text(formattedTime)
             .font(.largeTitle)
             .padding()
-            .background(Color.red)
-            .cornerRadius(8)
-            .foregroundColor(.white)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.black, lineWidth: 2)
+            )
             .onReceive(timer) { _ in updateTime() }
             .onAppear { updateTime() }
     }
 
     private var formattedTime: String {
         let total = max(Int(timeRemaining), 0)
-        let hours = total / 3600
-        let minutes = (total % 3600) / 60
-        return String(format: "%02dh %02dm", hours, minutes)
+        let days = total / 86_400
+        let hours = (total % 86_400) / 3_600
+        let minutes = (total % 3_600) / 60
+        return String(format: "%dd %02dh %02dm", days, hours, minutes)
     }
 
     private func updateTime() {
