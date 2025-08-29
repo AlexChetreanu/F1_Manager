@@ -35,8 +35,12 @@ struct RaceDetailView: View {
                         .frame(height: UIScreen.main.bounds.height / 2)
                         .padding()
                     if isUpcomingRace {
-                        CountdownView(dateString: race.date)
-                            .padding()
+                        VStack(spacing: 4) {
+                            Text("START IN")
+                                .font(.headline)
+                            CountdownView(dateString: race.date)
+                        }
+                        .padding()
                     }
                 }
             } else if selectedTab == 1 {
