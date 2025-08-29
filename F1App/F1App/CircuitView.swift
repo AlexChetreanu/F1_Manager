@@ -13,6 +13,7 @@ struct CircuitView: View {
     let lineColor: Color
     let lineWidth: CGFloat
     let sizeScale: CGFloat
+    let backgroundColor: Color
     struct DriverSelection: Identifiable {
         let driver: DriverInfo
         let point: LocationPoint
@@ -25,13 +26,15 @@ struct CircuitView: View {
         viewModel: HistoricalRaceViewModel,
         lineColor: Color = .white,
         lineWidth: CGFloat = 4,
-        sizeScale: CGFloat = 1.0
+        sizeScale: CGFloat = 1.0,
+        backgroundColor: Color = Color.gray.opacity(0.1)
     ) {
         self.coordinatesJSON = coordinatesJSON
         self.viewModel = viewModel
         self.lineColor = lineColor
         self.lineWidth = lineWidth
         self.sizeScale = sizeScale
+        self.backgroundColor = backgroundColor
     }
 
     // Determine track points either from view model or by parsing JSON
@@ -110,7 +113,7 @@ struct CircuitView: View {
                     }
                 }
                 .animation(.linear(duration: 1), value: viewModel.stepIndex)
-                .background(Color.gray.opacity(0.1))
+                .background(backgroundColor)
                 .cornerRadius(8)
                 .sheet(item: $selectedDriver) { selection in
                     if let sk = viewModel.sessionKey {
