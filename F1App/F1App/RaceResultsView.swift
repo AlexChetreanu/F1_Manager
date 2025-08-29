@@ -55,21 +55,25 @@ struct RaceResultsView: View {
                 Text(errorMessage)
                     .foregroundColor(.red)
             } else {
-                PodiumView(entries: Array(results.prefix(3)), viewModel: viewModel)
-                Divider()
-                ForEach(results.dropFirst(3)) { entry in
-                    HStack {
-                        Text("\(entry.position ?? 0)")
-                            .frame(width: 24, alignment: .trailing)
-                        Text(driverName(for: entry.driver_number))
-                        Spacer()
-                        if entry.dnf == true {
-                            Text("DNF")
-                                .foregroundColor(.red)
-                        } else {
-                            Text(gapText(for: entry.gap_to_leader))
-                                .foregroundColor(.secondary)
-                                .monospacedDigit()
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        PodiumView(entries: Array(results.prefix(3)), viewModel: viewModel)
+                        Divider()
+                        ForEach(results.filter { ($0.position ?? Int.max) > 3 }) { entry in
+                            HStack {
+                                Text("\(entry.position ?? 0)")
+                                    .frame(width: 24, alignment: .trailing)
+                                Text(driverName(for: entry.driver_number))
+                                Spacer()
+                                if entry.dnf == true {
+                                    Text("DNF")
+                                        .foregroundColor(.red)
+                                } else {
+                                    Text(gapText(for: entry.gap_to_leader))
+                                        .foregroundColor(.secondary)
+                                        .monospacedDigit()
+                                }
+                            }
                         }
                     }
                 }
