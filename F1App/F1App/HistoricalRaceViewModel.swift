@@ -195,6 +195,9 @@ class HistoricalRaceViewModel: ObservableObject {
             return
         }
 
+        // Încarcă snapshot-ul istoric bazat pe anul și circuitul selectat
+        loadSnapshot(forYear: yearInt, circuitKey: circuitKey)
+
         // Rezolvă sesiunea DOAR cu year + circuit_key
         resolveSession(year: yearInt, meetingKey: nil, circuitKey: circuitKey)
     }
@@ -777,6 +780,9 @@ class HistoricalRaceViewModel: ObservableObject {
                 switch result {
                 case .success(let snap):
                     self.snapshot = snap
+                    if let key = snap.session_key {
+                        self.sessionKey = key
+                    }
                     self.drivers = snap.drivers.map {
                         DriverInfo(driver_number: $0.driver_number,
                                    full_name: $0.name,
