@@ -93,6 +93,7 @@ struct ProfileView: View {
                 }
             }
             .navigationTitle("Profil")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
     
