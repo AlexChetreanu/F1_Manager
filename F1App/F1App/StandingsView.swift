@@ -1,9 +1,10 @@
 import SwiftUI
 
 struct StandingsView: View {
+    @EnvironmentObject var colorStore: TeamColorStore
     @State private var standings: [DriverStanding] = []
     @State private var selectedTab: String = "Piloți"
-    
+
     var body: some View {
         NavigationView {
             VStack (spacing: 0){
@@ -41,11 +42,23 @@ struct StandingsView: View {
                         }
                     } else {
                         ForEach(teamStandings(), id: \.team) { teamStanding in
-                            VStack(alignment: .leading) {
-                                Text(teamStanding.team)
-                                    .font(.headline)
-                                Text("Puncte: \(teamStanding.points)")
-                                    .font(.subheadline)
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(teamStanding.team)
+                                        .font(.headline)
+                                    Text("Puncte: \(teamStanding.points)")
+                                        .font(.subheadline)
+                                }
+                                Spacer()
+                                Circle()
+                                    .fill(colorStore.color(forTeamName: teamStanding.team))
+                                    .frame(width: 40, height: 40)
+                                    .overlay(
+                                        Image.teamLogo(for: teamStanding.team)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .padding(6)
+                                    )
                             }
                             .padding(.vertical, 4)
                         }
