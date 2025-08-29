@@ -27,16 +27,26 @@ struct RaceDetailView: View {
             Spacer()
 
             if selectedTab == 0 {
-                if race.status.lowercased() == "finished" {
-                    RaceResultsView(race: race, viewModel: viewModel)
-                        .padding()
-                } else {
-                    CircuitView(coordinatesJSON: race.coordinates, viewModel: viewModel)
-                        .frame(height: UIScreen.main.bounds.height / 2)
-                        .padding()
+                ZStack {
                     if isUpcomingRace {
-                        CountdownView(dateString: race.date)
+                        Image("nahuui")
+                            .resizable()
+                            .scaledToFill()
+                            .ignoresSafeArea()
+                    }
+                    if race.status.lowercased() == "finished" {
+                        RaceResultsView(race: race, viewModel: viewModel)
                             .padding()
+                    } else {
+                        VStack {
+                            CircuitView(coordinatesJSON: race.coordinates, viewModel: viewModel)
+                                .frame(height: UIScreen.main.bounds.height / 2)
+                                .padding()
+                            if isUpcomingRace {
+                                CountdownView(dateString: race.date)
+                                    .padding()
+                            }
+                        }
                     }
                 }
             } else if selectedTab == 1 {
