@@ -295,8 +295,8 @@
   },
   "keyToStringList": {
     "DatabaseDriversLRU": [
-      "sqlite",
-      "mysql"
+      "mysql",
+      "sqlite"
     ]
   }
 }]]></component>
