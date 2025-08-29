@@ -6,38 +6,21 @@ struct CountdownView: View {
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        HStack(spacing: 8) {
-            timeBox(value: components.days, label: "Zile")
-            timeBox(value: components.hours, label: "Ore")
-            timeBox(value: components.minutes, label: "Minute")
-        }
-        .onReceive(timer) { _ in updateTime() }
-        .onAppear { updateTime() }
+        Text(formattedTime)
+            .font(.largeTitle)
+            .padding()
+            .background(Color.red)
+            .cornerRadius(8)
+            .foregroundColor(.white)
+            .onReceive(timer) { _ in updateTime() }
+            .onAppear { updateTime() }
     }
 
-    private func timeBox(value: Int, label: String) -> some View {
-        VStack {
-            Text(String(format: "%02d", value))
-                .font(.title2)
-                .bold()
-            Text(label)
-                .font(.caption)
-        }
-        .padding(6)
-        .background(Color.white)
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(Color.black, lineWidth: 2)
-        )
-        .foregroundColor(.black)
-    }
-
-    private var components: (days: Int, hours: Int, minutes: Int) {
+    private var formattedTime: String {
         let total = max(Int(timeRemaining), 0)
-        let days = total / 86_400
-        let hours = (total % 86_400) / 3_600
-        let minutes = (total % 3_600) / 60
-        return (days, hours, minutes)
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        return String(format: "%02dh %02dm", hours, minutes)
     }
 
     private func updateTime() {
