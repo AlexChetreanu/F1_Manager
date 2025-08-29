@@ -96,6 +96,7 @@ class HistoricalRaceViewModel: ObservableObject {
     private var nextRaceControlIndex = 0
     private var nextOvertakeIndex = 0
     private var sessionStartDate: Date?
+    private var sessionEndDate: Date?
     private struct ActiveToast: Identifiable {
         let id: Int64
         let event: RaceEventDTO
@@ -118,6 +119,12 @@ class HistoricalRaceViewModel: ObservableObject {
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = TimeZone(secondsFromGMT: 0)
         f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSSSSS"
+        return f
+    }()
+    private let sessionFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        f.timeZone = TimeZone(secondsFromGMT: 0)
         return f
     }()
     private var trackBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1)
@@ -223,60 +230,96 @@ class HistoricalRaceViewModel: ObservableObject {
         }
     }
 
-    private struct ResolveResponse: Decodable {
+    private struct OpenF1SessionResponse: Decodable {
         let session_key: Int
         let meeting_key: Int
         let date_start: String?
         let date_end: String?
+        let gmt_offset: String?
     }
 
     private func resolveSession(year: Int, meetingKey: Int?, circuitKey: Int?) {
-        var comps = URLComponents(string: "\(API.base)/api/live/resolve")!
-        var items = [
+        guard let ck = circuitKey else { return }
+        var comps = URLComponents(string: "\(API.base)/api/openf1/sessions")!
+        comps.queryItems = [
+            URLQueryItem(name: "circuit_key", value: String(ck)),
+            URLQueryItem(name: "session_name", value: "Race"),
             URLQueryItem(name: "year", value: String(year))
         ]
-        if let mk = meetingKey {
-            items.append(URLQueryItem(name: "meeting_key", value: String(mk)))
-        } else if let ck = circuitKey {
-            items.append(URLQueryItem(name: "circuit_key", value: String(ck)))
-        }
-        comps.queryItems = items
 
-        let url = comps.url!
-        URLSession.shared.dataTask(with: url) { data, resp, error in
-            self.log("GET /live/resolve", "url=\(url)\nerr=\(String(describing: error)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
-            if let http = resp as? HTTPURLResponse, http.statusCode != 200 {
-                let body = String(data: data ?? Data(), encoding: .utf8) ?? ""
-                DispatchQueue.main.async { self.errorMessage = "Resolve \(http.statusCode): \(body)" }
-                return
+        func parseOffset(_ offset: String?) -> TimeInterval {
+            guard let offset = offset else { return 0 }
+            let sign: Double = offset.starts(with: "-") ? -1 : 1
+            let parts = offset.trimmingCharacters(in: CharacterSet(charactersIn: "+-")).split(separator: ":")
+            let h = Double(parts.first ?? "0") ?? 0
+            let m = Double(parts.dropFirst().first ?? "0") ?? 0
+            let s = Double(parts.dropFirst(2).first ?? "0") ?? 0
+            return sign * (h * 3600 + m * 60 + s)
+        }
+
+        func fetchByKey(session: OpenF1SessionResponse) {
+            var detail = URLComponents(string: "\(API.base)/api/openf1/sessions")!
+            detail.queryItems = [URLQueryItem(name: "session_key", value: String(session.session_key))]
+            guard let detailURL = detail.url else { return }
+            RequestThrottler.shared.execute {
+                URLSession.shared.dataTask(with: detailURL) { data, resp, err in
+                    self.log("GET /openf1/sessions", "url=\(detailURL)\nerr=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+                    if let http = resp as? HTTPURLResponse, http.statusCode == 429 {
+                        DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
+                            fetchByKey(session: session)
+                        }
+                        return
+                    }
+                    guard err == nil, let data = data,
+                          let detailed = try? JSONDecoder().decode([OpenF1SessionResponse].self, from: data).first else {
+                        DispatchQueue.main.async { self.errorMessage = "Nu am putut decoda răspunsul /sessions" }
+                        return
+                    }
+                    let offset = parseOffset(detailed.gmt_offset)
+                    var startUTC: Date? = nil
+                    var endUTC: Date? = nil
+                    if let ds = detailed.date_start, let d = self.sessionFormatter.date(from: ds) {
+                        startUTC = d.addingTimeInterval(-offset)
+                    }
+                    if let de = detailed.date_end, let d = self.sessionFormatter.date(from: de) {
+                        endUTC = d.addingTimeInterval(-offset)
+                    }
+                    DispatchQueue.main.async {
+                        self.sessionKey = detailed.session_key
+                        self.meetingKey = detailed.meeting_key
+                        self.sessionStart = detailed.date_start
+                        self.sessionEnd = detailed.date_end
+                        self.sessionStartDate = startUTC
+                        self.sessionEndDate = endUTC
+                        self.errorMessage = nil
+                        self.fetchDrivers(sessionKey: detailed.session_key)
+                        if self.sessionStartDate != nil {
+                            self.fetchRaceControl(sessionKey: detailed.session_key)
+                            self.fetchOvertakes(sessionKey: detailed.session_key)
+                        }
+                    }
+                }.resume()
             }
-            if let error = error {
-                DispatchQueue.main.async { self.errorMessage = "Eroare rețea la /resolve: \(error.localizedDescription)" }
-                return
-            }
-            guard let data = data,
-                  let session = try? JSONDecoder().decode(ResolveResponse.self, from: data) else {
-                DispatchQueue.main.async { self.errorMessage = "Nu am putut decoda răspunsul /resolve" }
-                return
-            }
-            DispatchQueue.main.async {
-                self.sessionKey = session.session_key
-                self.meetingKey = session.meeting_key
-                self.sessionStart = session.date_start
-                if let ds = session.date_start {
-                    self.sessionStartDate = self.backendFormatter.date(from: ds)
-                } else {
-                    self.sessionStartDate = nil
+        }
+
+        guard let url = comps.url else { return }
+        RequestThrottler.shared.execute {
+            URLSession.shared.dataTask(with: url) { data, resp, err in
+                self.log("GET /openf1/sessions", "url=\(url)\nerr=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+                if let http = resp as? HTTPURLResponse, http.statusCode == 429 {
+                    DispatchQueue.global().asyncAfter(deadline: .now() + 1) {
+                        self.resolveSession(year: year, meetingKey: meetingKey, circuitKey: circuitKey)
+                    }
+                    return
                 }
-                self.sessionEnd = session.date_end
-                self.errorMessage = nil
-                self.fetchDrivers(sessionKey: session.session_key)
-                if self.sessionStartDate != nil {
-                    self.fetchRaceControl(sessionKey: session.session_key)
-                    self.fetchOvertakes(sessionKey: session.session_key)
+                guard err == nil, let data = data,
+                      let session = try? JSONDecoder().decode([OpenF1SessionResponse].self, from: data).first else {
+                    DispatchQueue.main.async { self.errorMessage = "Nu am putut decoda răspunsul /sessions" }
+                    return
                 }
-            }
-        }.resume()
+                fetchByKey(session: session)
+            }.resume()
+        }
     }
 
     private func fetchDrivers(sessionKey: Int) {
@@ -421,17 +464,12 @@ class HistoricalRaceViewModel: ObservableObject {
     }
 
     private func fetchLocations(sessionKey: Int) {
-        guard let startString = sessionStart,
-              let start = backendFormatter.date(from: startString) else { return }
-        let end: Date
-        if let endString = sessionEnd,
-           let endDate = backendFormatter.date(from: endString) {
-            end = endDate
-        } else {
-            end = start.addingTimeInterval(3 * 60 * 60)
-        }
-        let startStr = dateFormatter.string(from: start)
-        let endStr = dateFormatter.string(from: end)
+        guard let start = sessionStartDate else { return }
+        let end = sessionEndDate ?? start.addingTimeInterval(3 * 60 * 60)
+        let startUTC = start.addingTimeInterval(-120)
+        let endUTC = end.addingTimeInterval(120)
+        let startStr = dateFormatter.string(from: startUTC)
+        let endStr = dateFormatter.string(from: endUTC)
         locationFetchCount = 0
 
         for driver in drivers {
@@ -449,12 +487,12 @@ class HistoricalRaceViewModel: ObservableObject {
                                   endStr: String,
                                   offset: Int,
                                   accumulated: [LocationPoint]) {
-            var comps = URLComponents(string: "\(openF1BaseURL)/location")!
+            var comps = URLComponents(string: "\(API.base)/api/openf1/location")!
             comps.queryItems = [
                 URLQueryItem(name: "session_key", value: String(sessionKey)),
                 URLQueryItem(name: "driver_number", value: String(driver.driver_number)),
-                URLQueryItem(name: "date__gt", value: startStr),
-                URLQueryItem(name: "date__lt", value: endStr),
+                URLQueryItem(name: "date__gte", value: startStr),
+                URLQueryItem(name: "date__lte", value: endStr),
                 URLQueryItem(name: "order_by", value: "date"),
                 URLQueryItem(name: "limit", value: "1000"),
                 URLQueryItem(name: "offset", value: String(offset))
@@ -728,17 +766,17 @@ class HistoricalRaceViewModel: ObservableObject {
                 return
             }
 
-            var comps = URLComponents(string: "\(API.base)/api/live/resolve")!
+            var comps = URLComponents(string: "\(API.base)/api/openf1/sessions")!
             comps.queryItems = [
-                URLQueryItem(name: "year", value: String(yearInt)),
                 URLQueryItem(name: "circuit_key", value: String(circuitKey)),
-                URLQueryItem(name: "date", value: String(race.date.prefix(10)))
+                URLQueryItem(name: "session_name", value: "Race"),
+                URLQueryItem(name: "year", value: String(yearInt))
             ]
             let resolveURL = comps.url!
             URLSession.shared.dataTask(with: resolveURL) { data, resp, err in
-                self.log("GET /live/resolve", "url=\(resolveURL)\nerr=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
-                guard err == nil, let data = data, let session = try? JSONDecoder().decode(ResolveResponse.self, from: data) else {
-                    DispatchQueue.main.async { self.diagnosisSummary = "resolve a eșuat. Vezi log." }
+                self.log("GET /openf1/sessions", "url=\(resolveURL)\nerr=\(String(describing: err)) status=\((resp as? HTTPURLResponse)?.statusCode ?? -1)\n\(self.previewBody(data))")
+                guard err == nil, let data = data, let session = try? JSONDecoder().decode([OpenF1SessionResponse].self, from: data).first else {
+                    DispatchQueue.main.async { self.diagnosisSummary = "sessions a eșuat. Vezi log." }
                     return
                 }
                 let sk = session.session_key
@@ -752,7 +790,7 @@ class HistoricalRaceViewModel: ObservableObject {
                         return
                     }
                     let countDrivers = dr.count
-                    var locURLC = URLComponents(string: "\(openF1BaseURL)/location")!
+                    var locURLC = URLComponents(string: "\(API.base)/api/openf1/location")!
                     locURLC.queryItems = [
                         URLQueryItem(name: "session_key", value: String(sk)),
                         URLQueryItem(name: "order_by", value: "date"),
